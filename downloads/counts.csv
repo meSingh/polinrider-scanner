@@ -128,3 +128,8 @@ date,tag,file,total
 2026-11-07,v3.0.1,polinrider-v3.0.1-windows-x86_64.tar.gz,1
 2026-11-07,v3.0.1,polinrider-v3.0.1-windows-x86_64.zip,1
 2026-11-07,v3.0.1,polinrider-v3.0.1.intoto.jsonl,1
+2026-11-08,v2.3.0,polinrider-v2.3.0-linux-arm64.deb,3
+2026-11-08,v2.3.0,polinrider-v2.3.0-linux-x86_64.deb,3
+2026-11-08,v2.3.0,polinrider-v2.3.0-source.tar.gz,3
+2026-11-08,v2.3.0,polinrider-v2.3.0-windows-x86_64.tar.gz,3
+2026-11-08,v2.3.0,polinrider-v2.3.0-windows-x86_64.zip,4
