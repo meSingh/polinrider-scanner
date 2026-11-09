@@ -399,10 +399,10 @@ weeks that found nothing. Each review keeps its own dated entry, and entries are
 never edited or removed:
 [the indicator reviews](https://polinriderscanner.com/indicator-reviews/).
 
-**Last reviewed: [2 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-02/).**
+**Last reviewed: [9 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-09/).**
 
-Island's report on the `MicrosoftSystem64` npm cluster behind 88 GitHub repositories
-added eight package names, a C2 address and six hashes. Two of the names, `oracle-redis` and `ioredis-xyz`, are still live on npm.
+No change this week. The dossier has not moved since July, and the OpenSSF records
+that quote the campaign carry no name this set lacks.
 
 From 2.3.0, the folder and computer checks read `weak.txt` too (ADR-0047).
 Up to 2.2.0, review-tier indicators reach only the CI scanner and the GitHub
