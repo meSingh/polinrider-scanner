@@ -2,9 +2,9 @@
 
 | Week from | Downloads | Ours | People |
 |---|---:|---:|---:|
-| 2026-11-09 | 28 | 0 | 28 |
+| 2026-11-09 | 48 | 0 | 48 |
 | 2026-11-02 | 36 | 0 | 36 |
 | before 2026-11-05 | 189 | 0 | 189 |
-| **All** | **253** | **0** | **253** |
+| **All** | **273** | **0** | **273** |
 
 Binaries and packages only; checksums and attestations are in weekly.csv. People can read below zero for a week when one of our downloads is recorded in a different week from the one GitHub counted it in.
