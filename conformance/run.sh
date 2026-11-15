@@ -144,6 +144,24 @@ impl_rust() {
   [[ -n "$report" ]] && args+=(--report "$report")
   [[ -n "$qdir" ]] && args+=(--apply --quarantine "$qdir")
   [[ -n "$IOC_DIR" ]] && args+=(--ioc "$IOC_DIR")
+  if [[ -n "$KILL_SIGNAL" ]]; then
+    # Killed part way, as a closed laptop lid or a kill would: once the
+    # report holds the line the case names, the signal is sent. The binary
+    # catches none (ADR-0059), so the exit status is the signal's.
+    local log pid krc
+    log="$(dirname "$report")/console.txt"
+    "$bin" "${args[@]}" "$@" > "$log" 2>&1 &
+    pid=$!
+    until grep -qF "$KILL_WHEN" "$report" 2>/dev/null; do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.02
+    done
+    kill -s "$KILL_SIGNAL" "$pid" 2>/dev/null
+    wait "$pid"
+    krc=$?
+    cat "$log"
+    return "$krc"
+  fi
   "$bin" "${args[@]}" "$@" 2>&1
 }
 
@@ -289,6 +307,8 @@ run_case() {
   FAKE_HOME="$tmp/home"; mkdir -p "$FAKE_HOME" "$tmp/tree" "$tmp/out"
 
   CASE_FILE="$cf"; TREE="$tmp/tree"
+  KILL_SIGNAL="$(jq -r '.kill.signal // empty' "$cf")"
+  KILL_WHEN="$(jq -r '.kill.when // empty' "$cf")"
 
   # build the fixture: the tree to scan, the home directory, and for a host
   # case the machine's state
@@ -435,6 +455,27 @@ run_case() {
     fi
     grep -qF "$wanted" "$rep" || errs+=("not in the report file, and must be: $wanted")
   done < <(jq -r '.expect.report_must_contain[]? // empty' "$cf")
+
+  # strings the report file must not hold once the run has ended
+  while IFS= read -r forbidden; do
+    [[ -z "$forbidden" ]] && continue
+    if [[ -z "$rep" || ! -f "$rep" ]]; then
+      errs+=("no report file was written")
+      break
+    fi
+    grep -qF "$forbidden" "$rep" && errs+=("in the report file, and must not be: $forbidden")
+  done < <(jq -r '.expect.report_must_not_contain[]? // empty' "$cf")
+
+  # the report file's first line, exactly
+  local want_first
+  want_first="$(jq -r '.expect.report_first_line // empty' "$cf")"
+  if [[ -n "$want_first" ]]; then
+    if [[ -z "$rep" || ! -f "$rep" ]]; then
+      errs+=("no report file was written")
+    elif [[ "$(sed -n 1p "$rep")" != "$want_first" ]]; then
+      errs+=("the report's first line is '$(sed -n 1p "$rep")', expected: $want_first")
+    fi
+  fi
 
   # files that must hold exactly this afterwards. Compared without trailing
   # newlines, which the fixture builder does not control on every platform.

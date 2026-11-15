@@ -106,9 +106,6 @@ pub(crate) enum Stop {
     Ended,
     /// The operator typed `back`.
     Back,
-    /// A scan was stopped by a signal. What it found is in the report, and
-    /// the stop has been said. ADR-0059.
-    Interrupted,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -329,8 +326,6 @@ pub fn run(session: &Session, io: &mut dyn Console) -> Outcome {
             );
         }
         Err(Stop::Back) => {}
-        // Said by the scan screen; the session is not a clean one.
-        Err(Stop::Interrupted) => worst = Some(ExitCode::CouldNotRun),
     }
 
     let exit = match worst {
@@ -607,24 +602,8 @@ fn local(
             io.progress(&region, false);
         }
         file.lines(&in_file.event(&event).lines);
-        !crate::interrupt::requested()
     });
     io.progress(&[], true);
-    if let Some(step) = found.stopped() {
-        for l in on_screen.stopped(step) {
-            io.say(&[p(l)]);
-        }
-        file.lines(&in_file.stopped(step));
-        file.write(&format!(
-            "\nfirst check, read-only, stopped\n{}",
-            scan::render(&found, Target::Report)
-        ));
-        report.push_str(&format!(
-            "\nfirst check, read-only, stopped during step {step} of 3\n{}",
-            scan::render(&found, Target::Report)
-        ));
-        return Err(Stop::Interrupted);
-    }
     report.push_str(&format!(
         "\nfirst check, read-only\n{}{}{}",
         step_times(&found),
@@ -1739,9 +1718,8 @@ mod tests {
                 scan::Event::Started(n) => format!("start {n}"),
                 scan::Event::Done(n, _) => format!("done {n}"),
                 scan::Event::Found(f) => format!("found {}", f.what()),
-                scan::Event::Count { .. } => return true,
+                scan::Event::Count { .. } => return,
             });
-            true
         });
         // The config is a step 1 file, so it is found in step 1, before the
         // project files are read or a single large file hashed.
@@ -1758,15 +1736,6 @@ mod tests {
             ]
         );
         assert_eq!(v.times().len(), 3);
-        assert_eq!(v.stopped(), None);
-
-        // Told to stop in step 2, it stops there and is not a clean result.
-        let v = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |event| {
-            !matches!(event, scan::Event::Started(2))
-        });
-        assert_eq!(v.stopped(), Some(2));
-        assert_eq!(v.exit_code(), ExitCode::CouldNotRun);
-        assert_eq!(v.hits(), 1, "what step 1 found is kept");
     }
 
     #[test]

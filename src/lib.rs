@@ -14,7 +14,6 @@ mod guide_github;
 pub mod host;
 pub mod host_checks;
 pub mod indicators;
-pub mod interrupt;
 pub mod manifest;
 pub mod pattern;
 pub mod quarantine;

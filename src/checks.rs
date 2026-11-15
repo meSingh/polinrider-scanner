@@ -440,16 +440,15 @@ pub struct ProjectFiles<'a> {
 
 /// `tick` is told how many files have been gone through, with the findings
 /// made since it was last told, every thousand files or so and after each
-/// finding. When it returns false the pass stops where it is and this
-/// returns false.
+/// finding.
 pub fn project_files(
     walk: &Walk,
     files: &ProjectFiles,
     ind: &Indicators,
     v: &mut Verdict,
     sink: &mut Sink,
-    tick: &mut dyn FnMut(usize, Vec<Finding>) -> bool,
-) -> bool {
+    tick: &mut dyn FnMut(usize, Vec<Finding>),
+) {
     // A file another check already reported is not read again for a weak
     // signal. Sorted, so a home folder's worth of findings is a lookup.
     let mut reported: Vec<PathBuf> = v.findings().filter_map(|f| f.path.clone()).collect();
@@ -461,13 +460,11 @@ pub fn project_files(
     let (mut sources_read, mut weak_read, mut stripped) = (0usize, 0usize, 0usize);
     let mut source_hits = 0usize;
     let mut weak_hits = 0usize;
-    let mut finished = true;
 
     for (n, path) in walk.files.iter().enumerate() {
         let before = sources.hits() + weak.reviews();
-        if n % 1024 == 0 && !pass_tick(tick, n, &mut sources, &mut weak) {
-            finished = false;
-            break;
+        if n % 1024 == 0 {
+            pass_tick(tick, n, &mut sources, &mut weak);
         }
         let name = path.file_name().and_then(|x| x.to_str()).unwrap_or("");
         let tooling = is_tooling(path, files.roots);
@@ -527,17 +524,11 @@ pub fn project_files(
                 );
             }
         }
-        if sources.hits() + weak.reviews() > before
-            && !pass_tick(tick, n + 1, &mut sources, &mut weak)
-        {
-            finished = false;
-            break;
+        if sources.hits() + weak.reviews() > before {
+            pass_tick(tick, n + 1, &mut sources, &mut weak);
         }
     }
-
-    if finished {
-        let _ = pass_tick(tick, walk.files.len(), &mut sources, &mut weak);
-    }
+    pass_tick(tick, walk.files.len(), &mut sources, &mut weak);
     if source_hits == 0 {
         sources.push(Finding::ok(format!(
             "{sources_read} JavaScript and TypeScript files read, none carries an indicator"
@@ -556,18 +547,17 @@ pub fn project_files(
     // Anything found since the last tick is handed on with the sections.
     v.append(sources);
     v.append(weak);
-    finished
 }
 
-/// Hand the pass's new findings to the scan and ask whether to go on. The
+/// Hand the pass's new findings to the scan. The
 /// findings stay in their own sections until the pass is done; only the
 /// stream sees them early.
 fn pass_tick(
-    tick: &mut dyn FnMut(usize, Vec<Finding>) -> bool,
+    tick: &mut dyn FnMut(usize, Vec<Finding>),
     n: usize,
     sources: &mut Verdict,
     weak: &mut Verdict,
-) -> bool {
+) {
     let mut fresh = sources.take_fresh();
     fresh.extend(weak.take_fresh());
     tick(n, fresh)
@@ -973,19 +963,19 @@ fn first_bytes(path: &Path) -> Option<[u8; 4]> {
 /// over unread past their first four bytes. Step 3.
 ///
 /// `hashing` is told (done, of) before each file is hashed, with the findings
-/// made since; when it returns false the sweep stops and this returns false.
+/// made since.
 pub fn known_hashes(
     walk: &Walk,
     ind: &Indicators,
     v: &mut Verdict,
     sink: &mut Sink,
-    hashing: &mut dyn FnMut(usize, usize, Vec<Finding>) -> bool,
-) -> bool {
+    hashing: &mut dyn FnMut(usize, usize, Vec<Finding>),
+) {
     v.section("Large files against known hashes");
     let known = &ind.hashes;
     if known.is_empty() {
         v.push(Finding::ok("no known hashes to compare"));
-        return true;
+        return;
     }
     let large: Vec<&PathBuf> = walk
         .files
@@ -999,9 +989,7 @@ pub fn known_hashes(
         .collect();
     let mut found = false;
     for (n, path) in programs.iter().copied().enumerate() {
-        if !hashing(n, programs.len(), v.take_fresh()) {
-            return false;
-        }
+        hashing(n, programs.len(), v.take_fresh());
         let Ok(digest) = crate::sha256::file(path) else {
             continue;
         };
@@ -1021,7 +1009,7 @@ pub fn known_hashes(
             );
         }
     }
-    let _ = hashing(programs.len(), programs.len(), v.take_fresh());
+    hashing(programs.len(), programs.len(), v.take_fresh());
     if !found {
         v.push(Finding::ok(
             "no file under the scanned paths matches a known implant hash",
@@ -1032,7 +1020,6 @@ pub fn known_hashes(
         programs.len(),
         large.len()
     ));
-    true
 }
 
 /// The propagation script the campaign drops to spread to other remotes.
@@ -1736,7 +1723,7 @@ mod tests {
         let mut v = Verdict::new();
         // Each finding reaches the watcher as it is made, not at the end.
         let mut streamed: Vec<String> = Vec::new();
-        let finished = project_files(
+        project_files(
             &walk,
             &ProjectFiles {
                 roots: std::slice::from_ref(&root),
@@ -1748,10 +1735,8 @@ mod tests {
             &mut Sink::Dry(&q),
             &mut |_, fresh| {
                 streamed.extend(fresh.into_iter().map(|f| f.message));
-                true
             },
         );
-        assert!(finished);
         assert_eq!(streamed.len(), 2, "{streamed:?}");
         assert!(v.take_fresh().is_empty(), "streamed once, not twice");
         let hits: Vec<(&str, Option<Kind>)> = v
@@ -1827,11 +1812,9 @@ mod tests {
         let q = Quarantine::<DryRun>::new(dir.join("q"));
         let mut v = Verdict::new();
         let mut asked: Vec<(usize, usize)> = Vec::new();
-        let done = known_hashes(&walk, &ind, &mut v, &mut Sink::Dry(&q), &mut |n, of, _| {
+        known_hashes(&walk, &ind, &mut v, &mut Sink::Dry(&q), &mut |n, of, _| {
             asked.push((n, of));
-            true
         });
-        assert!(done);
         assert_eq!(
             asked,
             vec![(0, 1), (1, 1)],
@@ -1840,16 +1823,6 @@ mod tests {
         assert_eq!(v.hits(), 1);
         assert!(v.entries().iter().any(|e| matches!(e, crate::verdict::Entry::Note(n)
             if n.starts_with("Hashed 1 of the 2 files of 10 MB to 300 MB: the ones that start like a program."))));
-        // Told to stop, it stops before the next file.
-        let mut v = Verdict::new();
-        assert!(!known_hashes(
-            &walk,
-            &ind,
-            &mut v,
-            &mut Sink::Dry(&q),
-            &mut |_, _, _| false
-        ));
-        assert_eq!(v.hits(), 0);
         let _ = fs::remove_dir_all(&dir);
     }
 

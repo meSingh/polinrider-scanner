@@ -296,9 +296,6 @@ impl Ui {
         if let Some(rest) = line.strip_prefix("    TO REVIEW") {
             return format!("{}{rest}", self.wrap(&[YELLOW, BOLD], "    TO REVIEW"));
         }
-        if line.starts_with("  Stopped during step ") {
-            return self.wrap(&[YELLOW, BOLD], line);
-        }
         if line.contains("QUARANTINE FAILED") || line.contains("STRIP FAILED") {
             // Not red: red is the finding. This is the tool failing to deal
             // with one, which needs a person.

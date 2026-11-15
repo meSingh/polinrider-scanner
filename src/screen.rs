@@ -3,7 +3,7 @@
 //!
 //! Pure: it is handed the scan's events and returns lines. The binary and the
 //! guided flow print them, and the report file is appended with the same
-//! lines as they come, so a scan that is stopped or dies has already saved
+//! lines as they come, so a scan that is killed has already saved
 //! everything it found.
 //!
 //! A live terminal gets a region drawn over in place: the step that is
@@ -60,19 +60,6 @@ impl Screen {
         }
     }
 
-    pub fn confirmed(&self) -> usize {
-        self.confirmed
-    }
-
-    pub fn review(&self) -> usize {
-        self.review
-    }
-
-    /// The step running now, 1 to 3, or 0 before the first.
-    pub fn step(&self) -> usize {
-        self.step
-    }
-
     pub fn event(&mut self, event: &Event) -> Frame {
         let mut frame = Frame::default();
         match *event {
@@ -124,28 +111,6 @@ impl Screen {
             }
         }
         self.frame(frame)
-    }
-
-    /// What is printed when a scan is stopped, after the last frame.
-    pub fn stopped(&self, step: usize) -> Vec<String> {
-        let mut out = Vec::new();
-        if self.live {
-            // The running step's findings were in the region, which is gone.
-            out.push(String::new());
-            out.push(header(step, "stopped"));
-            out.extend(self.held.iter().flatten().cloned());
-        }
-        out.push(String::new());
-        out.push(format!(
-            "  Stopped during step {step} of 3. This is not a clean result."
-        ));
-        out.push(match self.confirmed {
-            0 => "  Nothing was confirmed before the stop.".to_string(),
-            1 => "  1 confirmed finding is in the report.".to_string(),
-            n => format!("  {n} confirmed findings are in the report."),
-        });
-        out.push("  Run the same command again to scan everything.".to_string());
-        out
     }
 
     fn frame(&self, mut frame: Frame) -> Frame {
@@ -339,16 +304,6 @@ mod tests {
                 "    1 confirmed, 0 to review so far",
                 "",
                 "  Step 3 of 3  Large files against known hashes       waiting",
-            ]
-        );
-        assert_eq!(
-            s.stopped(2)[1..],
-            [
-                "  Step 2 of 3  Project files                          stopped".to_string(),
-                String::new(),
-                "  Stopped during step 2 of 3. This is not a clean result.".to_string(),
-                "  1 confirmed finding is in the report.".to_string(),
-                "  Run the same command again to scan everything.".to_string(),
             ]
         );
     }

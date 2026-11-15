@@ -141,7 +141,6 @@ pub fn walk_watched(roots: &[PathBuf], options: &Options, watch: &mut dyn FnMut(
         if let Seen::Listed(n) = seen {
             watch(n);
         }
-        true
     })
 }
 
@@ -158,28 +157,17 @@ pub enum Seen<'a> {
 
 /// The same walk, showing `see` each file and `.git` directory as it is
 /// found, so a check can read the few files that matter most without
-/// waiting for the walk of a whole drive to finish. `see` returning false
-/// stops the walk where it is; what was listed so far is returned. ADR-0059.
-pub fn walk_seeing(
-    roots: &[PathBuf],
-    options: &Options,
-    see: &mut dyn FnMut(Seen) -> bool,
-) -> Walk {
+/// waiting for the walk of a whole drive to finish. ADR-0059.
+pub fn walk_seeing(roots: &[PathBuf], options: &Options, see: &mut dyn FnMut(Seen)) -> Walk {
     let mut out = Walk::default();
     for root in roots {
-        let go = match fs::symlink_metadata(root) {
+        match fs::symlink_metadata(root) {
             Ok(m) if m.is_dir() => descend(root, &mut out, options, see),
             Ok(_) => {
+                see(Seen::File(root));
                 out.files.push(root.clone());
-                see(Seen::File(root))
             }
-            Err(_) => {
-                out.unreadable.push(root.clone());
-                true
-            }
-        };
-        if !go {
-            break;
+            Err(_) => out.unreadable.push(root.clone()),
         }
     }
     out.files.sort();
@@ -188,20 +176,14 @@ pub fn walk_seeing(
     out
 }
 
-/// False when the visitor asked to stop.
-fn descend(
-    dir: &Path,
-    out: &mut Walk,
-    options: &Options,
-    see: &mut dyn FnMut(Seen) -> bool,
-) -> bool {
+fn descend(dir: &Path, out: &mut Walk, options: &Options, see: &mut dyn FnMut(Seen)) {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         // An unreadable subdirectory is noted, not fatal: a scan of a backup
         // drive will hit directories the current user cannot open.
         Err(_) => {
             out.unreadable.push(dir.to_path_buf());
-            return true;
+            return;
         }
     };
 
@@ -217,11 +199,8 @@ fn descend(
         }
         if meta.is_dir() {
             if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
-                let go = see(Seen::GitDir(&path));
+                see(Seen::GitDir(&path));
                 out.git_dirs.push(path);
-                if !go {
-                    return false;
-                }
                 continue;
             }
             if options.excludes(&path) {
@@ -233,24 +212,18 @@ fn descend(
                 }
                 continue;
             }
-            if !descend(&path, out, options, see) {
-                return false;
-            }
+            descend(&path, out, options, see);
         } else if meta.is_file() {
             if options.excludes_file(&path) {
                 continue;
             }
-            let go = see(Seen::File(&path));
+            see(Seen::File(&path));
             out.files.push(path);
-            if out.files.len().is_multiple_of(TICK) && !see(Seen::Listed(out.files.len())) {
-                return false;
-            }
-            if !go {
-                return false;
+            if out.files.len().is_multiple_of(TICK) {
+                see(Seen::Listed(out.files.len()));
             }
         }
     }
-    true
 }
 
 impl Walk {

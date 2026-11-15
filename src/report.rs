@@ -1,8 +1,8 @@
 //! The report file, written as a scan goes. ADR-0059.
 //!
 //! Each line is appended and synced to the disk the moment it is written, so
-//! a scan that is stopped, killed or loses its power has already saved what
-//! it found. A machine whose battery dies takes the operating system's write
+//! a scan that is killed or loses its power has already saved what it
+//! found. A machine whose battery dies takes the operating system's write
 //! cache with it, which is why the file is synced and not only flushed.
 
 use std::fs::{self, File, OpenOptions};
@@ -14,6 +14,8 @@ pub struct Report {
     file: Option<File>,
     /// The first error, said once at the end rather than on every line.
     failed: Option<io::Error>,
+    /// Everything written, for [`Report::finish`].
+    written: String,
 }
 
 impl Report {
@@ -25,6 +27,7 @@ impl Report {
             path: path.to_path_buf(),
             file: None,
             failed: None,
+            written: String::new(),
         };
         let opened = (|| {
             if let Some(parent) = path.parent() {
@@ -65,12 +68,39 @@ impl Report {
         let Some(file) = self.file.as_mut() else {
             return;
         };
+        self.written.push_str(text);
         if let Err(e) = file
             .write_all(text.as_bytes())
             .and_then(|()| file.sync_data())
         {
             self.failed.get_or_insert(e);
             self.file = None;
+        }
+    }
+
+    /// The scan has ended and everything is written: replace the report's
+    /// first line, which said it was in progress, with `first_line`. The
+    /// whole report is written next to it and moved over it, so the file is
+    /// always one or the other and never half of each. Until this, a report
+    /// left by a killed scan says it is not a result. ADR-0059.
+    pub fn finish(&mut self, first_line: &str) {
+        // Closed first: a file still open cannot be replaced on Windows.
+        if self.file.take().is_none() {
+            return;
+        }
+        let rest = self.written.split_once('\n').map_or("", |(_, rest)| rest);
+        let mut name = self.path.file_name().unwrap_or_default().to_os_string();
+        name.push(".part");
+        let part = self.path.with_file_name(name);
+        let done = (|| {
+            let mut f = File::create(&part)?;
+            f.write_all(format!("{first_line}\n{rest}").as_bytes())?;
+            f.sync_all()?;
+            fs::rename(&part, &self.path)
+        })();
+        if let Err(e) = done {
+            let _ = fs::remove_file(&part);
+            self.failed.get_or_insert(e);
         }
     }
 
@@ -94,6 +124,28 @@ mod tests {
         // Read back while the report is still open: nothing waits for a close.
         assert_eq!(fs::read_to_string(&path).unwrap(), "opening\none\ntwo\n");
         assert!(r.error().is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_finished_report_loses_only_its_in_progress_line() {
+        let dir = std::env::temp_dir().join(format!("polinrider-finish-{}", std::process::id()));
+        let path = dir.join("report.txt");
+        let mut r = Report::create(&path, "check, in progress\n\nopening\n");
+        r.lines(&["one".to_string()]);
+        r.write("verdict\n");
+        // Killed here, the report says it is not a result.
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "check, in progress\n\nopening\none\nverdict\n"
+        );
+        r.finish("check");
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            "check\n\nopening\none\nverdict\n"
+        );
+        assert!(r.error().is_none());
+        assert_eq!(fs::read_dir(&dir).unwrap().count(), 1, "no .part left");
         let _ = fs::remove_dir_all(&dir);
     }
 

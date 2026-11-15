@@ -1,0 +1,37 @@
+{
+  "why": "The binary catches no signal (ADR-0059): Ctrl-C, a closed terminal or a kill ends it where it is, with the signal's exit status and no stop message. What it found before that is in the report, because each finding is synced to the disk as it is made. What the report must never do is read as a result: a scan killed in step 3 after a clean step 2 has found nothing more only because it stopped looking. So the report's first line says the scan is in progress until the verdict is written, and there is no verdict in it. The two large programs keep step 3 running long enough to be killed in it.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/.vscode/tasks.json": "{\"tasks\":[{\"runOptions\":{\"runOn\":\"folderOpen\"},\"command\":\"{{STRONG}}\"}]}\n"
+  },
+  "large_files": [
+    {
+      "path": "code/Apps/first-tool",
+      "head": "\\x7fELF\\x02\\x01\\x01",
+      "mb": 290
+    },
+    {
+      "path": "code/Apps/second-tool",
+      "head": "\\x7fELF\\x02\\x01\\x01\\x01",
+      "mb": 290
+    }
+  ],
+  "kill": {
+    "signal": "TERM",
+    "when": "  Step 3 of 3  Large files against known hashes"
+  },
+  "expect": {
+    "exit": 143,
+    "report_first_line": "PolinRider local check, in progress. The full report replaces this when the scan ends.",
+    "report_must_contain": [
+      "    CONFIRMED  an editor task runs the payload when the folder opens",
+      "  Step 3 of 3  Large files against known hashes"
+    ],
+    "report_must_not_contain": [
+      "== RESULT ==",
+      "Stopped during step"
+    ]
+  }
+}

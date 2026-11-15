@@ -10,7 +10,6 @@ use polinrider::cli::{self, Command, Rejection};
 use polinrider::guide::{self, Console, Session};
 use polinrider::host::{Host, LiveHost, Snapshot};
 use polinrider::indicators::Indicators;
-use polinrider::interrupt;
 use polinrider::quarantine::{Apply, DryRun, Quarantine};
 use polinrider::remote::{self, Forge, GitHub, Supplied};
 use polinrider::report::Report;
@@ -116,7 +115,14 @@ fn main() -> ProcExit {
             polinrider::quarantine::stamp(now())
         ))
     });
-    let mut file = Report::create(&report_path, &out);
+    // Its first line says the scan is in progress until the verdict is
+    // written, so a report left by a killed scan never reads as a result.
+    let (title, body) = out.split_once('\n').unwrap_or((&out, ""));
+    let title = title.to_string();
+    let mut file = Report::create(
+        &report_path,
+        &format!("{title}, in progress. The full report replaces this when the scan ends.\n{body}"),
+    );
     let saved = format!(
         "\n  Findings are saved as they are found:\n  {}\n",
         shown(&report_path, &args.home)
@@ -143,10 +149,9 @@ fn main() -> ProcExit {
     let mut painter = Painter { ui: &ui, drawn: 0 };
     let mut on_screen = Screen::new(&args.roots, ui.live);
     let mut in_file = Screen::new(&args.roots, false);
-    let mut tell = |event: Event| -> bool {
+    let mut tell = |event: Event| {
         painter.frame(&on_screen.event(&event));
         file.lines(&in_file.event(&event).lines);
-        !interrupt::requested()
     };
 
     let v = if args.apply {
@@ -172,20 +177,6 @@ fn main() -> ProcExit {
     drop(awake);
     painter.frame(&Frame::default());
 
-    if let Some(step) = v.stopped() {
-        let lines = on_screen.stopped(step);
-        emit(&ui.paint(&format!("{}\n\n", lines.join("\n"))));
-        // The report keeps what the checks that ran concluded, then the stop.
-        file.write(&format!(
-            "{}{}",
-            scan::step_times(&v),
-            scan::render(&v, Target::Report)
-        ));
-        file.lines(&in_file.stopped(step));
-        said_report(&file);
-        return ProcExit::from(v.exit_code().code() as u8);
-    }
-
     let closing = format!(
         "{}{}",
         scan::result(&v),
@@ -206,6 +197,7 @@ fn main() -> ProcExit {
         scan::step_times(&v),
         scan::render(&v, Target::Report)
     ));
+    file.finish(&title);
     said_report(&file);
     ProcExit::from(v.exit_code().code() as u8)
 }

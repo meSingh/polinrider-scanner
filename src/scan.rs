@@ -72,48 +72,40 @@ pub enum Event<'a> {
     Done(usize, Duration),
 }
 
-/// Hands findings and progress to the watcher, and asks it whether to go on.
+/// Hands findings and progress to the watcher.
 struct Stream<'a> {
-    tell: &'a mut dyn FnMut(Event) -> bool,
+    tell: &'a mut dyn FnMut(Event),
     step: usize,
     started: Instant,
-    go: bool,
 }
 
 impl Stream<'_> {
-    fn start(&mut self, step: usize) -> bool {
+    fn start(&mut self, step: usize) {
         self.step = step;
         self.started = Instant::now();
-        self.ask(Event::Started(step))
+        (self.tell)(Event::Started(step));
     }
 
-    fn ask(&mut self, event: Event) -> bool {
-        if !(self.tell)(event) {
-            self.go = false;
-        }
-        self.go
+    fn flush(&mut self, v: &mut Verdict) {
+        self.found(v.take_fresh());
     }
 
-    fn flush(&mut self, v: &mut Verdict) -> bool {
-        let fresh = v.take_fresh();
+    fn found(&mut self, fresh: Vec<Finding>) {
         for f in &fresh {
-            let _ = (self.tell)(Event::Found(f));
+            (self.tell)(Event::Found(f));
         }
-        self.go
     }
 
-    fn count(&mut self, n: usize, of: Option<usize>, fresh: Vec<Finding>) -> bool {
-        for f in &fresh {
-            let _ = (self.tell)(Event::Found(f));
-        }
+    fn count(&mut self, n: usize, of: Option<usize>, fresh: Vec<Finding>) {
+        self.found(fresh);
         let step = self.step;
-        self.ask(Event::Count { step, n, of })
+        (self.tell)(Event::Count { step, n, of });
     }
 
     fn done(&mut self, v: &mut Verdict) {
         let took = self.started.elapsed();
         v.timed(STEPS.get(self.step - 1).copied().unwrap_or(""), took);
-        let _ = (self.tell)(Event::Done(self.step, took));
+        (self.tell)(Event::Done(self.step, took));
     }
 }
 
@@ -133,32 +125,26 @@ pub fn step_times(v: &Verdict) -> String {
 /// Walk the roots once and run the checks. Whether anything is moved or
 /// stripped is decided by the sink, which is a type: see `quarantine`.
 pub fn run(scope: &Scope, sink: &mut Sink) -> Verdict {
-    run_watched(scope, sink, &mut |_| true)
+    run_watched(scope, sink, &mut |_| {})
 }
 
 /// The same scan, telling `tell` each step as it starts and ends, each
-/// finding as it is made and how far it has come. When `tell` returns false
-/// the scan stops where it is and returns what it has, marked as stopped.
-/// ADR-0059.
-pub fn run_watched(scope: &Scope, sink: &mut Sink, tell: &mut dyn FnMut(Event) -> bool) -> Verdict {
+/// finding as it is made and how far it has come. There is no way to stop
+/// it part way: a signal ends the process, and what was told before it is
+/// what the report keeps. ADR-0059.
+pub fn run_watched(scope: &Scope, sink: &mut Sink, tell: &mut dyn FnMut(Event)) -> Verdict {
     let mut s = Stream {
         tell,
         step: 1,
         started: Instant::now(),
-        go: true,
     };
     let mut v = Verdict::new();
-    let finished = steps(scope, sink, &mut s, &mut v);
-    if !finished {
-        // Anything found before the stop is handed over first.
-        let _ = s.flush(&mut v);
-        v.stop(s.step);
-    }
+    steps(scope, sink, &mut s, &mut v);
     v
 }
 
-/// The three steps. False when the watcher stopped them.
-fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> bool {
+/// The three steps.
+fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     let ind = scope.ind;
     let host = scope.host;
     // One line per host check that did not run, so a section that was skipped
@@ -169,9 +155,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
 
     // --- step 1: what runs by itself ----------------------------------------
     // What the machine itself holds comes first: it needs no walk.
-    if !s.start(1) {
-        return false;
-    }
+    s.start(1);
     if let Some(home) = scope.home {
         checks::implant_installs(
             ind,
@@ -183,9 +167,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
             v,
             sink,
         );
-        if !s.flush(v) {
-            return false;
-        }
+        s.flush(v);
         if host.is_some() {
             checks::extensions(&extension_dirs(home), ind, v, sink);
         } else {
@@ -202,9 +184,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
                 skipped(v, "Shell startup files");
             }
         }
-        if !s.flush(v) {
-            return false;
-        }
+        s.flush(v);
         match host {
             Some(host) => {
                 host_checks::npm_config(home, ind, v);
@@ -219,9 +199,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
                 skipped(v, "Live connections");
             }
         }
-        if !s.flush(v) {
-            return false;
-        }
+        s.flush(v);
     }
 
     // Then the walk, and the files that run by themselves read the moment it
@@ -236,7 +214,10 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
     let options = walk::Options::skipping(sink.root()).and_not(scope.report);
     let w = walk::walk_seeing(scope.roots, &options, &mut |seen| {
         match seen {
-            Seen::Listed(n) => return s.count(n, None, Vec::new()),
+            Seen::Listed(n) => {
+                s.count(n, None, Vec::new());
+                return;
+            }
             Seen::File(path) => {
                 if checks::is_tasks_json(path) {
                     tasks.inspect(path, ind, &mut tasks_v, sink);
@@ -247,7 +228,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
                 {
                     configs.inspect(path, ind, &mut configs_v, sink);
                 } else {
-                    return true;
+                    return;
                 }
             }
             Seen::GitDir(git_dir) => hooks.inspect(git_dir, ind, &mut hooks_v, sink),
@@ -255,13 +236,10 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
         let mut fresh = tasks_v.take_fresh();
         fresh.extend(configs_v.take_fresh());
         fresh.extend(hooks_v.take_fresh());
-        if fresh.is_empty() {
-            true
-        } else {
-            s.count(0, None, fresh)
+        if !fresh.is_empty() {
+            s.count(0, None, fresh);
         }
     });
-    let walked = s.go;
     v.section("Filesystem walk");
     v.set_files(w.files.len());
     v.push(Finding::info(format!(
@@ -277,29 +255,17 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
             bad.display()
         )));
     }
-    if !walked {
-        v.push(Finding::review(
-            "the walk was stopped before it finished, so the files after this point were not listed",
-        ));
-    }
     tasks.finish(&mut tasks_v);
     let configs_stripped = configs.finish(&mut configs_v) > 0;
     v.append(tasks_v);
     v.append(configs_v);
     v.append(hooks_v);
-    if !walked {
-        return false;
-    }
     runtimes::python_startup(&w, scope.home, host, ind, v, sink);
-    if !s.flush(v) {
-        return false;
-    }
+    s.flush(v);
     s.done(v);
 
     // --- step 2: the project files -------------------------------------------
-    if !s.start(2) {
-        return false;
-    }
+    s.start(2);
     checks::fonts(&w, ind, v, sink);
     // The propagation script is looked for on this computer and in folders;
     // a disk read with --fs-only from another machine's home is files only.
@@ -310,10 +276,8 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
     }
     checks::named_files(&w, ind, v, sink);
     checks::packages(&w, ind, v);
-    if !s.flush(v) {
-        return false;
-    }
-    let read = checks::project_files(
+    s.flush(v);
+    checks::project_files(
         &w,
         &checks::ProjectFiles {
             roots: scope.roots,
@@ -325,29 +289,19 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) -> boo
         sink,
         &mut |n, fresh| s.count(n, None, fresh),
     );
-    if !read {
-        return false;
-    }
     // The home directory is swept only when this machine is being read. A
     // disk checked with --fs-only gets the .env count and nothing more.
     checks::credentials(&w, host.and(scope.home), v);
-    if !s.flush(v) {
-        return false;
-    }
+    s.flush(v);
     s.done(v);
 
     // --- step 3: large files against the known hashes -------------------------
-    if !s.start(3) {
-        return false;
-    }
-    let swept = checks::known_hashes(&w, ind, v, sink, &mut |n, of, fresh| {
-        s.count(n, Some(of), fresh)
+    s.start(3);
+    checks::known_hashes(&w, ind, v, sink, &mut |n, of, fresh| {
+        s.count(n, Some(of), fresh);
     });
-    if !swept || !s.flush(v) {
-        return false;
-    }
+    s.flush(v);
     s.done(v);
-    true
 }
 
 /// Where a rendering is going. The console gets evidence cut to a readable
