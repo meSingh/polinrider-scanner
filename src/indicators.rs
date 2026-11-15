@@ -111,6 +111,21 @@ fn read_list(dir: &Path, name: &str, required: bool) -> Result<Vec<String>, Load
         .collect())
 }
 
+/// Every file [`Indicators::load`] reads. A file read there and missing here
+/// would let a check continue one made with other indicators (ADR-0060).
+pub const FILES: &[&str] = &[
+    "strong.txt",
+    "bad-packages.txt",
+    "weak.txt",
+    "network.txt",
+    "implant-names.txt",
+    "filenames.txt",
+    "filenames-review.txt",
+    "strong-patterns.txt",
+    "ssh-keys.txt",
+    "hashes.txt",
+];
+
 impl Indicators {
     pub fn load(dir: &Path) -> Result<Self, LoadError> {
         if !dir.is_dir() {
@@ -577,6 +592,20 @@ fn names_endpoint(line: &str, indicator: &str) -> bool {
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_file_load_reads_is_in_the_digest_list() {
+        let source = include_str!("indicators.rs");
+        let read: Vec<&str> = source
+            .split("read_list(dir, \"")
+            .skip(1)
+            .filter_map(|rest| rest.split('"').next())
+            .collect();
+        assert_eq!(read.len(), FILES.len(), "{read:?}");
+        for name in read {
+            assert!(FILES.contains(&name), "{name} is read but not in FILES");
+        }
+    }
 
     #[test]
     fn a_content_pattern_is_tried_near_its_fixed_part_and_must_have_one() {

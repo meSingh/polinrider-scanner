@@ -10,6 +10,7 @@ use polinrider::cli::{self, Command, Rejection};
 use polinrider::guide::{self, Console, Session};
 use polinrider::host::{Host, LiveHost, Snapshot};
 use polinrider::indicators::Indicators;
+use polinrider::progress;
 use polinrider::quarantine::{Apply, DryRun, Quarantine};
 use polinrider::remote::{self, Forge, GitHub, Supplied};
 use polinrider::report::Report;
@@ -18,8 +19,8 @@ use polinrider::screen::{Frame, Screen};
 use polinrider::ui::{Span, Ui};
 use polinrider::verdict::ExitCode;
 
-use std::io::{BufRead, Write};
-use std::path::Path;
+use std::io::{BufRead, IsTerminal, Write};
+use std::path::{Path, PathBuf};
 use std::process::ExitCode as ProcExit;
 
 /// Print to standard output, and carry on if nobody is reading.
@@ -115,6 +116,29 @@ fn main() -> ProcExit {
             polinrider::quarantine::stamp(now())
         ))
     });
+    emit(&ui.paint(&out));
+
+    // A check that moves nothing can continue one that stopped. ADR-0060.
+    let run = progress::Run {
+        version: cli::version(),
+        indicators: progress::indicators_digest(&args.ioc),
+        mode: "check".into(),
+        options: check_options(&args),
+        roots: args.roots.clone(),
+        report: report_path.clone(),
+    };
+    let resumable = !clean && !args.apply;
+    let (earlier, continued) = if resumable {
+        decide(&args, &run, &ui)
+    } else {
+        (None, None)
+    };
+    let offset = continued.as_ref().map(|_| progress::utc_offset());
+    if let (Some(p), Some(offset)) = (&continued, offset) {
+        emit(&ui.paint(&format!("{}\n", progress::continuing(p, offset).join("\n"))));
+    }
+    let resume = continued.as_ref().and_then(progress::Progress::resume);
+
     // Its first line says the scan is in progress until the verdict is
     // written, so a report left by a killed scan never reads as a result.
     let (title, body) = out.split_once('\n').unwrap_or((&out, ""));
@@ -127,7 +151,7 @@ fn main() -> ProcExit {
         "\n  Findings are saved as they are found:\n  {}\n",
         shown(&report_path, &args.home)
     );
-    emit(&ui.paint(&format!("{out}{saved}")));
+    emit(&ui.paint(&saved));
     file.write(&saved);
 
     let scope = Scope {
@@ -142,6 +166,7 @@ fn main() -> ProcExit {
             OnInfectedConfig::Report
         },
         report: Some(&report_path),
+        resume: resume.as_ref(),
     };
 
     // Asked not to sleep for as long as the scan runs.
@@ -149,9 +174,17 @@ fn main() -> ProcExit {
     let mut painter = Painter { ui: &ui, drawn: 0 };
     let mut on_screen = Screen::new(&args.roots, ui.live);
     let mut in_file = Screen::new(&args.roots, false);
+    if resume.is_some() {
+        on_screen = on_screen.resumed();
+        in_file = in_file.resumed();
+    }
+    let mut keeper = resumable.then(|| progress::Keeper::new(&run, earlier, now()));
     let mut tell = |event: Event| {
         painter.frame(&on_screen.event(&event));
         file.lines(&in_file.event(&event).lines);
+        if let Some(k) = keeper.as_mut() {
+            k.event(&event, now());
+        }
     };
 
     let v = if args.apply {
@@ -192,14 +225,94 @@ fn main() -> ProcExit {
         )
     );
     emit(&ui.paint(&format!("{}{closing}", scan::render(&v, Target::Console))));
+    let resumed = match (&continued, v.skipped(), offset) {
+        (Some(p), Some(skipped), Some(offset)) => progress::resumed_section(p, skipped, offset),
+        _ => String::new(),
+    };
     file.write(&format!(
-        "{}{}{closing}",
+        "{resumed}{}{}{closing}",
         scan::step_times(&v),
         scan::render(&v, Target::Report)
     ));
     file.finish(&title);
+    if let Some(k) = keeper {
+        k.finish();
+    }
     said_report(&file);
     ProcExit::from(v.exit_code().code() as u8)
+}
+
+/// What, besides the folders, decides what a check looks at. A check
+/// continues only one whose options were the same.
+fn check_options(args: &cli::Args) -> Vec<String> {
+    let host = match (&args.host_state, args.fs_only) {
+        (_, true) => "fs-only".to_string(),
+        (Some(dir), false) => format!("host-state {}", dir.display()),
+        (None, false) => "this machine".to_string(),
+    };
+    vec![host, format!("home {}", args.home.display())]
+}
+
+/// Whether to continue an earlier check: with --resume, yes; with --fresh,
+/// no; on a live terminal, asked; into a pipe, no, and said. Returns the
+/// earlier progress file this run supersedes when it continues it, and that
+/// check. One that is not continued is removed: this run replaces it.
+fn decide(
+    args: &cli::Args,
+    run: &progress::Run,
+    ui: &Ui,
+) -> (Option<PathBuf>, Option<progress::Progress>) {
+    use progress::Earlier;
+    let say = |lines: Vec<String>| emit(&ui.paint(&format!("{}\n", lines.join("\n"))));
+    match progress::find(run) {
+        Earlier::Usable { progress, path } => {
+            let go = if args.fresh {
+                false
+            } else if args.resume {
+                true
+            } else if ui.live && std::io::stdin().is_terminal() {
+                say(progress::question(&progress, progress::utc_offset()));
+                ask_yes_no()
+            } else {
+                say(progress::not_asked());
+                false
+            };
+            if go {
+                return (Some(path), Some(*progress));
+            }
+            let _ = std::fs::remove_file(path);
+        }
+        Earlier::Refused { why, path } => {
+            if !args.fresh {
+                say(progress::refused(&why));
+            }
+            let _ = std::fs::remove_file(path);
+        }
+        Earlier::None => {
+            if args.resume {
+                say(progress::nothing_to_resume());
+            }
+        }
+    }
+    (None, None)
+}
+
+/// A yes or a no, typed as a word. The end of input is a no: nothing is
+/// skipped without a yes.
+fn ask_yes_no() -> bool {
+    loop {
+        emit("  > ");
+        let mut answer = String::new();
+        match std::io::stdin().read_line(&mut answer) {
+            Ok(0) | Err(_) => return false,
+            Ok(_) => {}
+        }
+        match answer.trim().to_ascii_lowercase().as_str() {
+            "yes" | "y" => return true,
+            "no" | "n" => return false,
+            _ => emit("\n  Type yes or no.\n"),
+        }
+    }
 }
 
 fn now() -> u64 {

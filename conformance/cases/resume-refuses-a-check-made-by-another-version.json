@@ -1,0 +1,50 @@
+{
+  "why": "A progress file says how far an earlier check got, and only a check that would have read the same files the same way may skip them. One written by another version of PolinRider is not continued: what a version reads, and how, changes between versions. The run that follows starts from the beginning and reads every file, and the progress file it could not use is removed, so the question is not asked again (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "between": {
+    "progress_sed": [
+      "s/^version .*/version 2.9.9/"
+    ]
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  An earlier check of these folders did not finish, but it cannot be continued:",
+      "  it was made by PolinRider 2.9.9, so the part it read must be read again.",
+      "  Starting again from the beginning.",
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

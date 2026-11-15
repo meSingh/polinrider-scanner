@@ -45,6 +45,9 @@ pub struct Screen {
     count: Option<String>,
     confirmed: usize,
     review: usize,
+    /// This check continues one that stopped: step 2's count includes the
+    /// files the earlier one read. ADR-0060.
+    resumed: bool,
 }
 
 impl Screen {
@@ -57,7 +60,14 @@ impl Screen {
             count: None,
             confirmed: 0,
             review: 0,
+            resumed: false,
         }
+    }
+
+    /// The screen of a check that continues one that stopped.
+    pub fn resumed(mut self) -> Self {
+        self.resumed = true;
+        self
     }
 
     pub fn event(&mut self, event: &Event) -> Frame {
@@ -91,6 +101,10 @@ impl Screen {
                             format!("    {} of {} files hashed", thousands(n), thousands(of))
                         }
                         (1, _) => format!("    {} files listed so far", thousands(n)),
+                        _ if self.resumed => format!(
+                            "    {} files read so far, counting the earlier check",
+                            thousands(n)
+                        ),
                         _ => format!("    {} files read so far", thousands(n)),
                     });
                 }
@@ -109,6 +123,7 @@ impl Screen {
                 self.count = None;
                 self.step = n + 1;
             }
+            Event::Save { .. } => {}
         }
         self.frame(frame)
     }

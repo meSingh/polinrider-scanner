@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md), which saves step 2's place so a stopped check can be continued |
 | **Date** | 2026-11-15 |
 
 ## Context

@@ -436,19 +436,37 @@ pub struct ProjectFiles<'a> {
     pub roots: &'a [PathBuf],
     pub on_infected: OnInfectedConfig,
     pub configs_stripped: bool,
+    /// Where a check that continues a stopped one picks the pass up.
+    pub resume: Option<&'a crate::progress::Resume>,
 }
 
-/// `tick` is told how many files have been gone through, with the findings
-/// made since it was last told, every thousand files or so and after each
-/// finding.
+/// What the pass tells the scan as it goes.
+pub enum Pass<'a> {
+    /// How many files have been gone through, with the findings made since
+    /// the last time: every thousand files or so and after each finding.
+    Count(usize, Vec<Finding>),
+    /// A save point: the `n`th file is `at`, every file before it is done,
+    /// and these are the files the pass found something in so far. Every
+    /// [`crate::progress::SAVE_EVERY`] files, after their findings were told.
+    /// ADR-0060.
+    Save {
+        n: usize,
+        at: &'a Path,
+        found: &'a [PathBuf],
+    },
+}
+
+/// Files are gone through in the walk's sorted order, so a position in the
+/// pass is a path. A check that continues another skips every file before
+/// its save point, except those that had a finding, which are read again.
 pub fn project_files(
     walk: &Walk,
     files: &ProjectFiles,
     ind: &Indicators,
     v: &mut Verdict,
     sink: &mut Sink,
-    tick: &mut dyn FnMut(usize, Vec<Finding>),
-) {
+    tick: &mut dyn FnMut(Pass),
+) -> crate::progress::Skipped {
     // A file another check already reported is not read again for a weak
     // signal. Sorted, so a home folder's worth of findings is a lookup.
     let mut reported: Vec<PathBuf> = v.findings().filter_map(|f| f.path.clone()).collect();
@@ -460,11 +478,31 @@ pub fn project_files(
     let (mut sources_read, mut weak_read, mut stripped) = (0usize, 0usize, 0usize);
     let mut source_hits = 0usize;
     let mut weak_hits = 0usize;
+    let mut found: Vec<PathBuf> = Vec::new();
+    let mut skipped = crate::progress::Skipped::default();
 
     for (n, path) in walk.files.iter().enumerate() {
         let before = sources.hits() + weak.reviews();
-        if n % 1024 == 0 {
+        let save = n > 0 && n % crate::progress::SAVE_EVERY == 0;
+        if n % 1024 == 0 || save {
             pass_tick(tick, n, &mut sources, &mut weak);
+        }
+        if save {
+            tick(Pass::Save {
+                n,
+                at: path,
+                found: &found,
+            });
+        }
+        if let Some(resume) = files.resume {
+            if *path < resume.from {
+                if resume.reread.binary_search(path).is_ok() {
+                    skipped.reread += 1;
+                } else {
+                    skipped.skipped += 1;
+                    continue;
+                }
+            }
         }
         let name = path.file_name().and_then(|x| x.to_str()).unwrap_or("");
         let tooling = is_tooling(path, files.roots);
@@ -505,7 +543,10 @@ pub fn project_files(
                     ) {
                         stripped += 1;
                     }
-                    // Reported here, so not again as a weak signal.
+                    // Reported here, so not again as a weak signal. Told
+                    // now, and kept for a check that continues this one.
+                    found.push(path.clone());
+                    pass_tick(tick, n + 1, &mut sources, &mut weak);
                     continue;
                 }
             }
@@ -525,6 +566,7 @@ pub fn project_files(
             }
         }
         if sources.hits() + weak.reviews() > before {
+            found.push(path.clone());
             pass_tick(tick, n + 1, &mut sources, &mut weak);
         }
     }
@@ -547,20 +589,16 @@ pub fn project_files(
     // Anything found since the last tick is handed on with the sections.
     v.append(sources);
     v.append(weak);
+    skipped
 }
 
 /// Hand the pass's new findings to the scan. The
 /// findings stay in their own sections until the pass is done; only the
 /// stream sees them early.
-fn pass_tick(
-    tick: &mut dyn FnMut(usize, Vec<Finding>),
-    n: usize,
-    sources: &mut Verdict,
-    weak: &mut Verdict,
-) {
+fn pass_tick(tick: &mut dyn FnMut(Pass), n: usize, sources: &mut Verdict, weak: &mut Verdict) {
     let mut fresh = sources.take_fresh();
     fresh.extend(weak.take_fresh());
-    tick(n, fresh)
+    tick(Pass::Count(n, fresh))
 }
 
 /// The evidence for a cut, printed above the finding: the last line that
@@ -1729,12 +1767,15 @@ mod tests {
                 roots: std::slice::from_ref(&root),
                 on_infected: OnInfectedConfig::Strip,
                 configs_stripped: false,
+                resume: None,
             },
             &ind,
             &mut v,
             &mut Sink::Dry(&q),
-            &mut |_, fresh| {
-                streamed.extend(fresh.into_iter().map(|f| f.message));
+            &mut |pass| {
+                if let Pass::Count(_, fresh) = pass {
+                    streamed.extend(fresh.into_iter().map(|f| f.message));
+                }
             },
         );
         assert_eq!(streamed.len(), 2, "{streamed:?}");
@@ -1759,6 +1800,73 @@ mod tests {
         );
         assert!(is_js_source("App.JSX") && is_js_source("server.ts") && !is_js_source("app.json"));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_pass_saves_its_place_and_a_continued_one_skips_what_was_read() {
+        // Paths only: a file that cannot be read is passed over, so the
+        // positions and the save points are all this tests.
+        let root = PathBuf::from("/nonexistent-polinrider-pass");
+        let files: Vec<PathBuf> = (0..12_000)
+            .map(|i| root.join(format!("{i:05}.js")))
+            .collect();
+        let walk = Walk {
+            files: files.clone(),
+            ..Walk::default()
+        };
+        let ind =
+            Indicators::load(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ioc")).expect("ioc");
+        let q = Quarantine::<DryRun>::new(root.join("q"));
+        let run = |resume: Option<&crate::progress::Resume>| {
+            let mut saves = Vec::new();
+            let mut v = Verdict::new();
+            let skipped = project_files(
+                &walk,
+                &ProjectFiles {
+                    roots: std::slice::from_ref(&root),
+                    on_infected: OnInfectedConfig::Report,
+                    configs_stripped: false,
+                    resume,
+                },
+                &ind,
+                &mut v,
+                &mut Sink::Dry(&q),
+                &mut |pass| {
+                    if let Pass::Save { n, at, .. } = pass {
+                        saves.push((n, at.to_path_buf()));
+                    }
+                },
+            );
+            (saves, skipped)
+        };
+        let (saves, skipped) = run(None);
+        // Every 5,000 files, naming the file not yet gone through.
+        assert_eq!(
+            saves,
+            vec![
+                (5_000, root.join("05000.js")),
+                (10_000, root.join("10000.js"))
+            ]
+        );
+        assert_eq!(skipped, crate::progress::Skipped::default());
+
+        let resume = crate::progress::Resume {
+            from: root.join("05000.js"),
+            reread: vec![root.join("00010.js"), root.join("07000.js")],
+        };
+        let (saves, skipped) = run(Some(&resume));
+        // Before the save point, only the file that had a finding is gone
+        // through again; the one after it would be read anyway.
+        assert_eq!(
+            skipped,
+            crate::progress::Skipped {
+                skipped: 4_999,
+                reread: 1
+            }
+        );
+        // Positions are the walk's, so a continued pass saves where the
+        // first one would have.
+        assert_eq!(saves.len(), 2);
     }
 
     #[test]

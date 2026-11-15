@@ -31,6 +31,9 @@ pub struct Scope<'a> {
     pub on_infected_config: OnInfectedConfig,
     /// This run's report file, written while the scan goes on. Never listed.
     pub report: Option<&'a Path>,
+    /// Where step 2's pass over the project files picks up, when this check
+    /// continues one that stopped. ADR-0060.
+    pub resume: Option<&'a crate::progress::Resume>,
 }
 
 fn extension_dirs(home: &Path) -> Vec<PathBuf> {
@@ -70,6 +73,14 @@ pub enum Event<'a> {
     Found(&'a Finding),
     /// Step `n` has finished, and how long it took.
     Done(usize, Duration),
+    /// A save point in step 2: every file before `at`, the `n`th, is done,
+    /// and `found` are the files the pass found something in so far. For the
+    /// progress file. ADR-0060.
+    Save {
+        n: usize,
+        at: &'a Path,
+        found: &'a [PathBuf],
+    },
 }
 
 /// Hands findings and progress to the watcher.
@@ -277,18 +288,25 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     checks::named_files(&w, ind, v, sink);
     checks::packages(&w, ind, v);
     s.flush(v);
-    checks::project_files(
+    let skipped = checks::project_files(
         &w,
         &checks::ProjectFiles {
             roots: scope.roots,
             on_infected: scope.on_infected_config,
             configs_stripped,
+            resume: scope.resume,
         },
         ind,
         v,
         sink,
-        &mut |n, fresh| s.count(n, None, fresh),
+        &mut |pass| match pass {
+            checks::Pass::Count(n, fresh) => s.count(n, None, fresh),
+            checks::Pass::Save { n, at, found } => (s.tell)(Event::Save { n, at, found }),
+        },
     );
+    if scope.resume.is_some() {
+        v.set_skipped(skipped);
+    }
     // The home directory is swept only when this machine is being read. A
     // disk checked with --fs-only gets the .env count and nothing more.
     checks::credentials(&w, host.and(scope.home), v);

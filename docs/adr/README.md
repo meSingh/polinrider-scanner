@@ -45,7 +45,7 @@ If you disagree with one, open an issue and quote its number.
 | [0027](./0027-development-and-testing-happen-in-a-container.md) | Development and testing happen in a container | Accepted |
 | [0028](./0028-the-documentation-site-is-astro-starlight.md) | The documentation site is Astro Starlight, on a Node toolchain | Superseded by 0055 |
 | [0029](./0029-host-state-is-read-through-one-boundary-and-can-be-supplied.md) | Host state is read through one boundary, and can be supplied | Accepted |
-| [0030](./0030-2-0-does-not-checkpoint-a-scan.md) | 2.0 does not checkpoint a scan | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) |
+| [0030](./0030-2-0-does-not-checkpoint-a-scan.md) | 2.0 does not checkpoint a scan | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) and [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
 | [0031](./0031-clean-strips-an-appended-payload-in-place-and-never-touches-git.md) | clean strips an appended payload in place, and never touches git | Accepted |
 | [0032](./0032-the-guided-flow-changes-something-only-on-a-typed-yes.md) | The guided flow changes something only on a typed yes | Accepted |
 | [0033](./0033-every-run-opens-with-the-banner-and-colour-changes-no-character.md) | Every run opens with the banner, and colour changes no character | Accepted |
@@ -73,7 +73,8 @@ If you disagree with one, open an issue and quote its number.
 | [0056](./0056-the-docs-are-versioned-by-release-line.md) | Keep a frozen copy of the docs for each release line | Accepted |
 | [0057](./0057-the-repository-is-polinrider-scanner-from-3-0-0.md) | Rename the repository and its packages to polinrider-scanner, from 3.0.0 | Accepted |
 | [0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) | Confirm the var z and global.i tags, and read every JavaScript file | Accepted |
-| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted |
+| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
+| [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
 
 ## Adding one
 

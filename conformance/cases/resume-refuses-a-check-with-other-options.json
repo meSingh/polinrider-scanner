@@ -1,0 +1,50 @@
+{
+  "why": "A check with other options (reading this machine, --fs-only, --host-state or another home) is not continued: what it looks at differs, so what the earlier one concluded about the files before its save point does not carry over. The run that follows starts from the beginning and reads every file, and the progress file it could not use is removed, so the question is not asked again (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "between": {
+    "progress_sed": [
+      "s/^option fs-only$/option this machine/"
+    ]
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  An earlier check of these folders did not finish, but it cannot be continued:",
+      "  it used different options.",
+      "  Starting again from the beginning.",
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

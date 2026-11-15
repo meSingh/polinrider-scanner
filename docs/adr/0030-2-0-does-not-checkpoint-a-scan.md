@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md), which keeps it and adds the order, streaming and bounded sweep |
+| **Status** | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md), which keeps it and adds the order, streaming and bounded sweep; and by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md), which lets a stopped check be continued from a save point with no inventory, and refuses one that does not match |
 | **Date** | 2026-10-03 |
 
 ## Context

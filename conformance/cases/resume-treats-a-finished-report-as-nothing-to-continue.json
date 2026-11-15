@@ -1,0 +1,50 @@
+{
+  "why": "A report whose first line no longer says it is in progress belongs to a check that finished. Its progress file is left over, not a check to continue: --resume says there is nothing to continue, starts from the beginning and the leftover file is removed (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "between": {
+    "report_sed": [
+      "1s/, in progress.*//"
+    ]
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  There is no unfinished check of these folders to continue.",
+      "  Starting from the beginning.",
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "Continuing the check",
+      "cannot be continued"
+    ],
+    "progress_after": "absent"
+  }
+}

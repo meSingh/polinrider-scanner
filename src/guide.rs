@@ -29,6 +29,7 @@
 use crate::checks::{OnInfectedConfig, Sink};
 use crate::host::Host;
 use crate::indicators::Indicators;
+use crate::progress;
 use crate::quarantine::{Apply, DryRun, Quarantine};
 use crate::remote::{Forge, OwnerKind};
 use crate::report::Report;
@@ -533,6 +534,64 @@ fn worse(a: Option<ExitCode>, b: Option<ExitCode>) -> Option<ExitCode> {
     }
 }
 
+/// Whether to continue an unfinished guided check of the same folders: the
+/// question, or why it cannot be. Returns the earlier progress file this run
+/// supersedes, and the check it continues. One not continued is removed.
+fn earlier_check(
+    io: &mut dyn Console,
+    run: &progress::Run,
+) -> Result<(Option<PathBuf>, Option<progress::Progress>), Stop> {
+    match progress::find(run) {
+        progress::Earlier::Usable { progress, path } => {
+            blank(io, 1);
+            line(io, "  An earlier check of these folders did not finish.");
+            line(
+                io,
+                &format!(
+                    "  It started on {} and stopped in step {}, after {} files.",
+                    progress::when(progress.started, progress::utc_offset(), false),
+                    progress.step,
+                    thousands(progress.files)
+                ),
+            );
+            blank(io, 1);
+            line(io, "  Continue from where it stopped?");
+            blank(io, 1);
+            io.say(&[
+                p("  Type "),
+                word("yes"),
+                p(" to carry on from there, and redo the quick checks."),
+            ]);
+            io.say(&[
+                p("  Type "),
+                word("no"),
+                p(" to start again from the beginning."),
+            ]);
+            loop {
+                match read(io)?.as_str() {
+                    "yes" | "y" => return Ok((Some(path), Some(*progress))),
+                    "no" | "n" => {
+                        let _ = std::fs::remove_file(path);
+                        return Ok((None, None));
+                    }
+                    _ => {
+                        blank(io, 1);
+                        io.say(&[warn("  Type yes or no. q quits.")]);
+                    }
+                }
+            }
+        }
+        progress::Earlier::Refused { why, path } => {
+            for l in progress::refused(&why) {
+                line(io, &l);
+            }
+            let _ = std::fs::remove_file(path);
+            Ok((None, None))
+        }
+        progress::Earlier::None => Ok((None, None)),
+    }
+}
+
 /// This computer, or folders on it: steps 2 to 4.
 fn local(
     session: &Session,
@@ -542,6 +601,32 @@ fn local(
     worst: &mut Option<ExitCode>,
 ) -> Result<Finished, Stop> {
     let roots = choose_roots(session, what, io)?;
+
+    // An unfinished guided check of the same folders can be continued: asked
+    // here, in the flow's own words. ADR-0060.
+    let run = progress::Run {
+        version: crate::cli::version(),
+        indicators: progress::indicators_digest(session.ioc_dir),
+        mode: "guide".into(),
+        options: vec![
+            if what == What::Computer {
+                "this computer".into()
+            } else {
+                "folders".into()
+            },
+            format!("home {}", session.home.display()),
+        ],
+        roots: roots.clone(),
+        report: session.report.to_path_buf(),
+    };
+    let (earlier, continued) = earlier_check(io, &run)?;
+    let offset = continued.as_ref().map(|_| progress::utc_offset());
+    if let (Some(p), Some(offset)) = (&continued, offset) {
+        for l in progress::continuing(p, offset) {
+            line(io, &l);
+        }
+    }
+    let resume = continued.as_ref().and_then(progress::Progress::resume);
 
     let scope = Scope {
         roots: &roots,
@@ -557,6 +642,7 @@ fn local(
         // shown before the question is the number done after it.
         on_infected_config: OnInfectedConfig::Strip,
         report: Some(session.report),
+        resume: resume.as_ref(),
     };
 
     // --- 3: check, and say what was found -----------------------------------
@@ -588,7 +674,13 @@ fn local(
     );
     let mut on_screen = Screen::new(&roots, io.live());
     let mut in_file = Screen::new(&roots, false);
+    if resume.is_some() {
+        on_screen = on_screen.resumed();
+        in_file = in_file.resumed();
+    }
+    let mut keeper = progress::Keeper::new(&run, earlier, progress::now());
     let found = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |event| {
+        keeper.event(&event, progress::now());
         let frame = on_screen.event(&event);
         if !frame.lines.is_empty() {
             // Lines for good go above the region: take it down first.
@@ -604,8 +696,13 @@ fn local(
         file.lines(&in_file.event(&event).lines);
     });
     io.progress(&[], true);
+    keeper.finish();
+    let resumed = match (&continued, found.skipped(), offset) {
+        (Some(p), Some(skipped), Some(offset)) => progress::resumed_section(p, skipped, offset),
+        _ => String::new(),
+    };
     report.push_str(&format!(
-        "\nfirst check, read-only\n{}{}{}",
+        "\nfirst check, read-only\n{resumed}{}{}{}",
         step_times(&found),
         scan::render(&found, Target::Report),
         scan::result(&found)
@@ -1604,6 +1701,91 @@ mod tests {
         )
     }
 
+    /// An unfinished guided check of `repo`, stopped with its save point
+    /// after every file there, which had found something in `src/a.js`.
+    fn stopped_guided_check(w: &World) {
+        let home = w.dir.join("home");
+        let report = home.join("polinrider-report.txt");
+        fs::write(
+            &report,
+            "PolinRider guided check, in progress. The full report replaces this when the session ends.\n",
+        )
+        .expect("write");
+        let repo = PathBuf::from(w.repo());
+        let mut p = progress::Run {
+            version: crate::cli::version(),
+            indicators: progress::indicators_digest(&w.dir.join("ioc")),
+            mode: "guide".into(),
+            options: vec!["folders".into(), format!("home {}", home.display())],
+            roots: vec![repo.clone()],
+            report: report.clone(),
+        }
+        .progress(1_763_143_320);
+        p.pid = 0;
+        p.save(
+            5_000,
+            &repo.join("zzz"),
+            &[repo.join("src/a.js")],
+            1_763_143_400,
+        );
+        p.write(&progress::path_for(&report)).expect("write");
+    }
+
+    #[test]
+    fn a_stopped_guided_check_is_continued_on_a_yes_and_reads_only_what_it_must() {
+        let w = World::new(
+            "resume-yes",
+            &[
+                ("repo/src/a.js", &infected()),
+                ("repo/src/b.js", &infected()),
+            ],
+        );
+        stopped_guided_check(&w);
+        let (outcome, io) = w.run(&["folder", &w.repo(), "", "yes", "no", "done"]);
+        assert!(
+            io.said
+                .contains("  An earlier check of these folders did not finish."),
+            "{}",
+            io.said
+        );
+        assert!(io.said.contains("  Continue from where it stopped?"));
+        assert!(io
+            .said
+            .contains("  Type yes to carry on from there, and redo the quick checks."));
+        assert!(io
+            .said
+            .contains("  Steps 1 and 3 run again in full. They are quick."));
+        // a.js had a finding and is read again; b.js sorts before the save
+        // point and had none, so it is not read: the stopped check read it.
+        assert!(outcome.report.contains("src/a.js"), "{}", outcome.report);
+        assert!(!outcome.report.contains("src/b.js"), "{}", outcome.report);
+        assert!(outcome.report.contains("== Resumed =="));
+        assert!(!progress::path_for(&w.dir.join("home/polinrider-report.txt")).exists());
+    }
+
+    #[test]
+    fn a_stopped_guided_check_is_started_again_on_a_no() {
+        let w = World::new(
+            "resume-no",
+            &[
+                ("repo/src/a.js", &infected()),
+                ("repo/src/b.js", &infected()),
+            ],
+        );
+        stopped_guided_check(&w);
+        let (outcome, io) = w.run(&["folder", &w.repo(), "", "maybe", "no", "no", "done"]);
+        assert!(
+            io.said.contains("  Type yes or no. q quits."),
+            "{}",
+            io.said
+        );
+        assert!(!io.said.contains("Continuing the check"));
+        assert!(outcome.report.contains("src/a.js"));
+        assert!(outcome.report.contains("src/b.js"), "every file is read");
+        assert!(!outcome.report.contains("== Resumed =="));
+        assert!(!progress::path_for(&w.dir.join("home/polinrider-report.txt")).exists());
+    }
+
     #[test]
     fn quitting_before_a_check_is_not_a_clean_result() {
         let w = World::new("quit", &[]);
@@ -1710,6 +1892,7 @@ mod tests {
             host: None,
             on_infected_config: OnInfectedConfig::Report,
             report: None,
+            resume: None,
         };
         let dry = Quarantine::<DryRun>::new(&w.quarantine);
         let mut seen: Vec<String> = Vec::new();
@@ -1718,7 +1901,7 @@ mod tests {
                 scan::Event::Started(n) => format!("start {n}"),
                 scan::Event::Done(n, _) => format!("done {n}"),
                 scan::Event::Found(f) => format!("found {}", f.what()),
-                scan::Event::Count { .. } => return,
+                scan::Event::Count { .. } | scan::Event::Save { .. } => return,
             });
         });
         // The config is a step 1 file, so it is found in step 1, before the

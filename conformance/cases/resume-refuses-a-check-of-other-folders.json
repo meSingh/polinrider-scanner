@@ -1,0 +1,46 @@
+{
+  "why": "A progress file belongs to one report and one set of folders. Named with the same --report, a check of other folders is not continued from it: its save points are paths in folders this check does not read, and skipping by them would skip the wrong files. The run that follows starts from the beginning and reads every file, and the progress file it could not use is removed, so the question is not asked again (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ],
+    "roots": [
+      "code/a"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  An earlier check of these folders did not finish, but it cannot be continued:",
+      "  it checked different folders.",
+      "  Starting again from the beginning."
+    ],
+    "must_not_print": [
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

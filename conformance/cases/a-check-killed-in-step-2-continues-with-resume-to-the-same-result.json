@@ -1,0 +1,62 @@
+{
+  "why": "A check of a large drive that stops in step 2 should not have to read again everything it already read (ADR-0060). Killed after its second save point, it is continued with --resume: steps 1 and 3 run in full, and step 2 goes back to the older save point, the 5,000th file, and reads from there. The infected file sorts before that point and is read again because the stopped run found something in it, so the result is the one a check that was never stopped gives: same exit code, same findings. The count of files read for weak signals proves the 4,999 clean files before the save point were not read again: an uninterrupted check reads 10,099 of the small files, the continued one 5,100. The large text files keep step 2 running long enough to be killed in it.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/a/00010.js": "{{STRONG}}\n"
+  },
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 10100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big-0.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    },
+    {
+      "path": "code/b/big-1.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 10000 "
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ]
+  },
+  "compare_uninterrupted": true,
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "code/a/00010.js"
+      }
+    ],
+    "must_print": [
+      "  Continuing the check that stopped on ",
+      "  Step 2 goes back about 10,000 files before the stop and carries on from there.",
+      "5100 files read for weak signals, none matched"
+    ],
+    "report_must_contain": [
+      "== Resumed ==",
+      "/code/a/05000.js (5,000 files before the stop) to the end, and the 1 file that had a finding.",
+      "  The 4,999 files before that point were read on "
+    ],
+    "progress_after": "absent"
+  }
+}

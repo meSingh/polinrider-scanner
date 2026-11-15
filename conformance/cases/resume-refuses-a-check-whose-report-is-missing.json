@@ -1,0 +1,48 @@
+{
+  "why": "A progress file is continued only alongside the report it belongs to. With the report gone, there is no record of what the earlier check found before its save point, so nothing about that part can be shown to anyone. The run that follows starts from the beginning and reads every file, and the progress file it could not use is removed, so the question is not asked again (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "between": {
+    "remove_report": true
+  },
+  "then": {
+    "args": [
+      "--resume"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  An earlier check of these folders did not finish, but it cannot be continued:",
+      "  its report is missing.",
+      "  Starting again from the beginning.",
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

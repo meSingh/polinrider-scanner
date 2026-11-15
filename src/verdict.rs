@@ -412,6 +412,8 @@ pub struct Verdict {
     fresh: Vec<Finding>,
     /// How long each step took, in order.
     times: Vec<(String, std::time::Duration)>,
+    /// What a check that continued another did not read again. ADR-0060.
+    skipped: Option<crate::progress::Skipped>,
 }
 
 impl Verdict {
@@ -445,6 +447,14 @@ impl Verdict {
 
     pub fn times(&self) -> &[(String, std::time::Duration)] {
         &self.times
+    }
+
+    pub fn set_skipped(&mut self, skipped: crate::progress::Skipped) {
+        self.skipped = Some(skipped);
+    }
+
+    pub fn skipped(&self) -> Option<crate::progress::Skipped> {
+        self.skipped
     }
 
     /// Start a section. Every check opens one, so a section that prints no

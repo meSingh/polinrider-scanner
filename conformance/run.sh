@@ -144,15 +144,19 @@ impl_rust() {
   [[ -n "$report" ]] && args+=(--report "$report")
   [[ -n "$qdir" ]] && args+=(--apply --quarantine "$qdir")
   [[ -n "$IOC_DIR" ]] && args+=(--ioc "$IOC_DIR")
+  # A second run of a case (ADR-0060) can add flags of its own.
+  args+=(${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
   if [[ -n "$KILL_SIGNAL" ]]; then
     # Killed part way, as a closed laptop lid or a kill would: once the
     # report holds the line the case names, the signal is sent. The binary
     # catches none (ADR-0059), so the exit status is the signal's.
-    local log pid krc
+    local log pid krc watched="$report"
+    # Or once the progress file beside it holds the line (ADR-0060).
+    [[ "$KILL_IN" == "progress" ]] && watched="${report%.*}.progress"
     log="$(dirname "$report")/console.txt"
     "$bin" "${args[@]}" "$@" > "$log" 2>&1 &
     pid=$!
-    until grep -qF "$KILL_WHEN" "$report" 2>/dev/null; do
+    until grep -qF "$KILL_WHEN" "$watched" 2>/dev/null; do
       kill -0 "$pid" 2>/dev/null || break
       sleep 0.02
     done
@@ -309,6 +313,8 @@ run_case() {
   CASE_FILE="$cf"; TREE="$tmp/tree"
   KILL_SIGNAL="$(jq -r '.kill.signal // empty' "$cf")"
   KILL_WHEN="$(jq -r '.kill.when // empty' "$cf")"
+  KILL_IN="$(jq -r '.kill.in // "report"' "$cf")"
+  EXTRA_ARGS=()
 
   # build the fixture: the tree to scan, the home directory, and for a host
   # case the machine's state
@@ -316,13 +322,30 @@ run_case() {
   build_files "$cf" home "$FAKE_HOME"
   # Files too large to write out in a case: their first bytes, then zeros to
   # the size given in MB. For the large-file hash sweep (ADR-0059).
-  local big_path big_head big_mb
-  while IFS=$'\t' read -r big_path big_head big_mb; do
+  # With "fill", the rest is that character instead: a large text file,
+  # which takes time to read.
+  local big_path big_head big_mb big_fill
+  while IFS=$'\t' read -r big_path big_head big_mb big_fill; do
     [[ -z "$big_path" ]] && continue
     mkdir -p "$tmp/tree/$(dirname "$big_path")"
     printf '%b' "$big_head" > "$tmp/tree/$big_path"
-    dd if=/dev/zero bs=1048576 count="$big_mb" 2>/dev/null >> "$tmp/tree/$big_path"
-  done < <(jq -r '.large_files // [] | .[] | "\(.path)\t\(.head)\t\(.mb)"' "$cf")
+    if [[ -n "$big_fill" ]]; then
+      head -c $((big_mb * 1048576)) /dev/zero | tr '\0' "$big_fill" >> "$tmp/tree/$big_path"
+    else
+      dd if=/dev/zero bs=1048576 count="$big_mb" 2>/dev/null >> "$tmp/tree/$big_path"
+    fi
+  done < <(jq -r '.large_files // [] | .[] | "\(.path)\t\(.head)\t\(.mb)\t\(.fill // "")"' "$cf")
+  # Many small files with the same content, named 00000.js upwards: a tree
+  # with save points in it (ADR-0060). A file the case names is kept.
+  local many_dir many_count many_content many_i many_f
+  while IFS=$'\t' read -r many_dir many_count many_content; do
+    [[ -z "$many_dir" ]] && continue
+    mkdir -p "$tmp/tree/$many_dir"
+    for ((many_i = 0; many_i < many_count; many_i++)); do
+      printf -v many_f '%s/%05d.js' "$tmp/tree/$many_dir" "$many_i"
+      [[ -e "$many_f" ]] || printf '%s\n' "$many_content" > "$many_f"
+    done
+  done < <(jq -r '.many_files // [] | .[] | "\(.dir)\t\(.count)\t\(.content)"' "$cf")
   FORGE_STATE=""
   if [[ "$(jq -r 'has("forge") or has("forge_files")' "$cf")" == "true" ]]; then
     FORGE_STATE="$tmp/forge"
@@ -374,6 +397,44 @@ run_case() {
   [[ "$(jq -r '.no_report // false' "$cf")" == "true" ]] && rep_arg=""
   out="$("impl_$IMPL" "$rep_arg" "$tmp/out/state" "$qdir" "${roots[@]}")"
   rc=$?
+  # A case of two runs: the first, killed part way, leaves a progress file;
+  # what is between them is done to it or to its report; the second run is
+  # the one the expectations are about (ADR-0060).
+  local first_command="$COMMAND"
+  if [[ "$(jq -r 'has("then")' "$cf")" == "true" ]]; then
+    local prog="${rep%.*}.progress" ed
+    while IFS= read -r ed; do
+      [[ -z "$ed" ]] && continue
+      sed -e "$ed" "$prog" > "$prog.edit" && mv "$prog.edit" "$prog"
+    done < <(jq -r '.between.progress_sed[]? // empty' "$cf")
+    while IFS= read -r ed; do
+      [[ -z "$ed" ]] && continue
+      sed -e "$ed" "$rep" > "$rep.edit" && mv "$rep.edit" "$rep"
+    done < <(jq -r '.between.report_sed[]? // empty' "$cf")
+    [[ "$(jq -r '.between.remove_report // false' "$cf")" == "true" ]] && rm -f "$rep"
+    KILL_SIGNAL=""
+    COMMAND="$(jq -r --arg c "$first_command" '.then.command // $c' "$cf")"
+    EXTRA_ARGS=()
+    while IFS= read -r ed; do EXTRA_ARGS+=("$ed"); done < <(jq -r '.then.args[]? // empty' "$cf")
+    local then_roots=()
+    if [[ "$(jq -r '.then | has("roots")' "$cf")" == "true" ]]; then
+      while IFS= read -r r; do then_roots+=("$tmp/tree/$r"); done < <(jq -r '.then.roots[]' "$cf")
+    else
+      then_roots=("${roots[@]}")
+    fi
+    out="$("impl_$IMPL" "$rep_arg" "$tmp/out/state" "$qdir" "${then_roots[@]}")"
+    rc=$?
+    COMMAND="$first_command"
+  fi
+  # The same tree checked once, from the start and never stopped: what a
+  # continued check must agree with, exit code and every finding.
+  local whole="" whole_rc=""
+  if [[ "$(jq -r '.compare_uninterrupted // false' "$cf")" == "true" ]]; then
+    mkdir -p "$tmp/whole"
+    KILL_SIGNAL=""; EXTRA_ARGS=()
+    whole="$("impl_$IMPL" "$tmp/whole/report.txt" "$tmp/whole/state" "" "${roots[@]}")"
+    whole_rc=$?
+  fi
   if [[ -z "$rep_arg" ]]; then
     rep="$(find "$FAKE_HOME" -maxdepth 1 -name 'polinrider-report-*.txt' 2>/dev/null | sed -n 1p)"
   fi
@@ -465,6 +526,26 @@ run_case() {
     fi
     grep -qF "$forbidden" "$rep" && errs+=("in the report file, and must not be: $forbidden")
   done < <(jq -r '.expect.report_must_not_contain[]? // empty' "$cf")
+
+  # whether the progress file is there once the run has ended
+  local want_progress
+  want_progress="$(jq -r '.expect.progress_after // empty' "$cf")"
+  if [[ -n "$want_progress" ]]; then
+    local have_progress=absent
+    [[ -f "${rep%.*}.progress" ]] && have_progress=present
+    [[ "$have_progress" == "$want_progress" ]] \
+      || errs+=("the progress file is $have_progress afterwards, expected $want_progress")
+  fi
+
+  if [[ -n "$whole_rc" ]]; then
+    [[ "$rc" == "$whole_rc" ]] \
+      || errs+=("exit code $rc, and $whole_rc for the same tree checked from the start")
+    local found_here found_whole
+    found_here="$(printf '%s\n' "$out" | grep -E '\[(HIT|review)\]' | LC_ALL=C sort || true)"
+    found_whole="$(printf '%s\n' "$whole" | grep -E '\[(HIT|review)\]' | LC_ALL=C sort || true)"
+    [[ "$found_here" == "$found_whole" ]] \
+      || errs+=("findings differ from the same tree checked from the start")
+  fi
 
   # the report file's first line, exactly
   local want_first
@@ -620,7 +701,11 @@ refusals() {
   check_refusal "an unknown flag"            check --not-a-real-flag "$tmp"
   check_refusal "a flag it has not built"    check --jobs 4 "$tmp"
   check_refusal "a flag 2.0 removed, --state"        check --state /tmp/s "$tmp"
-  check_refusal "a flag 2.0 removed, --resume"       check --resume "$tmp"
+  # --resume is real again, for a check that moves nothing (ADR-0060).
+  check_refusal "clean told to --resume"             clean --resume "$tmp"
+  check_refusal "the guided flow told to --resume"   guide --resume
+  check_refusal "--resume alongside --fresh"         check --resume --fresh "$tmp"
+  check_refusal "--resume alongside --apply"         check --apply --resume "$tmp"
   check_refusal "a root that does not exist" check "$tmp/definitely-absent"
   check_refusal "no root at all"             check --fs-only
   check_refusal "a missing indicator set"    check --ioc "$tmp/no-ioc-here" "$tmp"

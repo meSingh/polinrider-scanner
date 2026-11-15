@@ -16,6 +16,7 @@ pub mod host_checks;
 pub mod indicators;
 pub mod manifest;
 pub mod pattern;
+pub mod progress;
 pub mod quarantine;
 pub mod remote;
 pub mod remote_fix;
