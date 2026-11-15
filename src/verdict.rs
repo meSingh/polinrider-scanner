@@ -406,6 +406,15 @@ pub struct Verdict {
     /// How many files the walk listed. Said back to the operator, because
     /// "it was quick" and "it looked at eight files" are the same fact.
     files: usize,
+    /// Confirmed and review findings not yet handed to whoever is watching,
+    /// in the order they were found. A scan streams them as it goes, so a
+    /// process that dies has already saved what it found. ADR-0059.
+    fresh: Vec<Finding>,
+    /// The step a scan was stopped in, when it was. A stopped scan is not a
+    /// clean one, whatever it found before the stop.
+    stopped: Option<usize>,
+    /// How long each step took, in order.
+    times: Vec<(String, std::time::Duration)>,
 }
 
 impl Verdict {
@@ -414,7 +423,41 @@ impl Verdict {
     }
 
     pub fn push(&mut self, finding: Finding) {
+        if matches!(finding.level, Level::Hit | Level::Review) {
+            self.fresh.push(finding.clone());
+        }
         self.entries.push(Entry::Finding(finding));
+    }
+
+    /// The confirmed and review findings pushed since the last call, oldest
+    /// first.
+    pub fn take_fresh(&mut self) -> Vec<Finding> {
+        std::mem::take(&mut self.fresh)
+    }
+
+    /// Move another verdict's entries onto the end of this one. Its findings
+    /// not yet taken stay to be taken from this one.
+    pub fn append(&mut self, mut other: Verdict) {
+        self.entries.append(&mut other.entries);
+        self.fresh.append(&mut other.fresh);
+    }
+
+    /// Mark the scan as stopped during `step`. Its exit code is then
+    /// `CouldNotRun`: a scan that did not finish has not shown anything clean.
+    pub fn stop(&mut self, step: usize) {
+        self.stopped = Some(step);
+    }
+
+    pub fn stopped(&self) -> Option<usize> {
+        self.stopped
+    }
+
+    pub fn timed(&mut self, step: impl Into<String>, took: std::time::Duration) {
+        self.times.push((step.into(), took));
+    }
+
+    pub fn times(&self) -> &[(String, std::time::Duration)] {
+        &self.times
     }
 
     /// Start a section. Every check opens one, so a section that prints no
@@ -469,11 +512,13 @@ impl Verdict {
 
     /// The exit code this verdict implies.
     ///
-    /// `CouldNotRun` is never produced here: it means the scan did not happen,
-    /// which is a condition the caller detects before there is a verdict to
-    /// read at all.
+    /// `CouldNotRun` is produced here only for a scan that was stopped before
+    /// it finished. Otherwise it means the scan did not happen, which the
+    /// caller detects before there is a verdict to read at all.
     pub fn exit_code(&self) -> ExitCode {
-        if self.hits() > 0 {
+        if self.stopped.is_some() {
+            ExitCode::CouldNotRun
+        } else if self.hits() > 0 {
             ExitCode::Confirmed
         } else if self.reviews() > 0 {
             ExitCode::Review

@@ -134,12 +134,14 @@ impl_rust() {
   if [[ "$COMMAND" == "clean" ]]; then
     # clean reads the roots and nothing else: no home, no host, and it refuses
     # the flags that would say otherwise.
-    args=(clean --report "$report")
+    args=(clean)
   else
-    args=(check --home "$FAKE_HOME" --report "$report")
+    args=(check --home "$FAKE_HOME")
     # A host case supplies the machine; every other case reads no host state.
     if [[ -n "$HOST_STATE" ]]; then args+=(--host-state "$HOST_STATE"); else args+=(--fs-only); fi
   fi
+  # An empty report path is a run left to choose its own: the home directory.
+  [[ -n "$report" ]] && args+=(--report "$report")
   [[ -n "$qdir" ]] && args+=(--apply --quarantine "$qdir")
   [[ -n "$IOC_DIR" ]] && args+=(--ioc "$IOC_DIR")
   "$bin" "${args[@]}" "$@" 2>&1
@@ -292,6 +294,15 @@ run_case() {
   # case the machine's state
   build_files "$cf" files "$tmp/tree"
   build_files "$cf" home "$FAKE_HOME"
+  # Files too large to write out in a case: their first bytes, then zeros to
+  # the size given in MB. For the large-file hash sweep (ADR-0059).
+  local big_path big_head big_mb
+  while IFS=$'\t' read -r big_path big_head big_mb; do
+    [[ -z "$big_path" ]] && continue
+    mkdir -p "$tmp/tree/$(dirname "$big_path")"
+    printf '%b' "$big_head" > "$tmp/tree/$big_path"
+    dd if=/dev/zero bs=1048576 count="$big_mb" 2>/dev/null >> "$tmp/tree/$big_path"
+  done < <(jq -r '.large_files // [] | .[] | "\(.path)\t\(.head)\t\(.mb)"' "$cf")
   FORGE_STATE=""
   if [[ "$(jq -r 'has("forge") or has("forge_files")' "$cf")" == "true" ]]; then
     FORGE_STATE="$tmp/forge"
@@ -333,8 +344,19 @@ run_case() {
   fi
   before="$(snapshot "$tmp/tree")"
   [[ -n "$HOST_STATE" ]] && before+="$(snapshot "$FAKE_HOME")$(snapshot "$HOST_STATE")"
-  out="$("impl_$IMPL" "$tmp/out/report.txt" "$tmp/out/state" "$qdir" "${roots[@]}")"
+  # Where the report goes: the usual place, a path inside the tree being
+  # scanned, or nowhere given, so the run picks its own in the home directory.
+  local rep="$tmp/out/report.txt" rep_arg
+  if [[ "$(jq -r '.report_in_tree // empty' "$cf")" != "" ]]; then
+    rep="$tmp/tree/$(jq -r '.report_in_tree' "$cf")"
+  fi
+  rep_arg="$rep"
+  [[ "$(jq -r '.no_report // false' "$cf")" == "true" ]] && rep_arg=""
+  out="$("impl_$IMPL" "$rep_arg" "$tmp/out/state" "$qdir" "${roots[@]}")"
   rc=$?
+  if [[ -z "$rep_arg" ]]; then
+    rep="$(find "$FAKE_HOME" -maxdepth 1 -name 'polinrider-report-*.txt' 2>/dev/null | sed -n 1p)"
+  fi
   after="$(snapshot "$tmp/tree")"
   [[ -n "$HOST_STATE" ]] && after+="$(snapshot "$FAKE_HOME")$(snapshot "$HOST_STATE")"
 
@@ -373,7 +395,7 @@ run_case() {
   # file. This is the redaction guard: a secret the scan read must not be a
   # secret the scan wrote down.
   local everything="$out"
-  [[ -f "$tmp/out/report.txt" ]] && everything+="$(cat "$tmp/out/report.txt")"
+  [[ -n "$rep" && -f "$rep" ]] && everything+="$(cat "$rep")"
   while IFS= read -r forbidden; do
     [[ -z "$forbidden" ]] && continue
     grep -qF "$forbidden" <<<"$everything" \
@@ -389,6 +411,30 @@ run_case() {
     grep -qF "$wanted" <<<"$out" \
       || errs+=("not printed, and must be: $wanted")
   done < <(jq -r '.expect.must_print[]? // empty' "$cf")
+
+  # strings that must appear in the console output in this order: a step and
+  # what it found before the next step starts (ADR-0059).
+  local after_line=0 at
+  while IFS= read -r wanted; do
+    [[ -z "$wanted" ]] && continue
+    at="$(printf '%s\n' "$out" | awk -v from="$after_line" -v w="$wanted" \
+      'NR > from && index($0, w) { print NR; exit }')"
+    if [[ -z "$at" ]]; then
+      errs+=("not printed in order, after line $after_line: $wanted")
+      break
+    fi
+    after_line="$at"
+  done < <(jq -r '.expect.print_order[]? // empty' "$cf")
+
+  # strings the report file must hold, as written while the scan ran
+  while IFS= read -r wanted; do
+    [[ -z "$wanted" ]] && continue
+    if [[ -z "$rep" || ! -f "$rep" ]]; then
+      errs+=("no report file was written")
+      break
+    fi
+    grep -qF "$wanted" "$rep" || errs+=("not in the report file, and must be: $wanted")
+  done < <(jq -r '.expect.report_must_contain[]? // empty' "$cf")
 
   # files that must hold exactly this afterwards. Compared without trailing
   # newlines, which the fixture builder does not control on every platform.

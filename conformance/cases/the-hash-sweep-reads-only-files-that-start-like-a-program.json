@@ -1,0 +1,53 @@
+{
+  "why": "The sweep of files from 10 MB to 300 MB exists for the MicrosoftSystem64 binaries, and on a backup drive full of videos and disk images it read every one of them in full. Equal hashes mean equal bytes, so a file whose first bytes are not those of a program cannot match a hash of one: only files that start like ELF, Mach-O or a Windows PE are hashed. Every entry of that size in hashes.txt is one of those (JFrog and SafeDep give their formats). This case pins the cost of the rule as well as its gain: a hash of a large file that is not a program would be missed, so one may never be added without changing the rule (ADR-0059).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const a = 1\n"
+  },
+  "large_files": [
+    {
+      "path": "code/Apps/renamed-tool",
+      "head": "\\x7fELF\\x02\\x01\\x01",
+      "mb": 11
+    },
+    {
+      "path": "code/Media/holiday.mp4",
+      "head": "\\x00\\x00\\x00\\x18ftypmp42",
+      "mb": 11
+    }
+  ],
+  "known_hashes": [
+    {
+      "path": "code/Apps/renamed-tool",
+      "label": "program fixture"
+    },
+    {
+      "path": "code/Media/holiday.mp4",
+      "label": "video fixture"
+    }
+  ],
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "file matches a known implant hash (program fixture)",
+        "path": "Apps/renamed-tool"
+      }
+    ],
+    "must_not_report": [
+      "holiday.mp4",
+      "video fixture"
+    ],
+    "print_order": [
+      "  Step 3 of 3  Large files against known hashes",
+      "    CONFIRMED  the second-stage implant is on this disk",
+      "               Apps/renamed-tool"
+    ],
+    "report_must_contain": [
+      "Hashed 1 of the 2 files of 10 MB to 300 MB: the ones that start like a program."
+    ]
+  }
+}

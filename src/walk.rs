@@ -58,6 +58,10 @@ pub struct Options<'a> {
     /// scan, which finds every artifact it holds and reports the machine as
     /// still infected by its own evidence.
     pub skip: Option<PathBuf>,
+    /// One file never listed: this run's own report, which is written while
+    /// the walk goes on and may sit under a scanned root. Read, it would be
+    /// a weak signal of its own making. ADR-0059.
+    pub skip_file: Option<PathBuf>,
 }
 
 impl Default for Options<'_> {
@@ -65,6 +69,7 @@ impl Default for Options<'_> {
         Self {
             prune: PRUNED,
             skip: None,
+            skip_file: None,
         }
     }
 }
@@ -77,7 +82,22 @@ impl<'a> Options<'a> {
         Self {
             prune: PRUNED,
             skip: fs::canonicalize(quarantine).ok(),
+            skip_file: None,
         }
+    }
+
+    /// Never list `report` either. Resolved once, like the quarantine; a
+    /// report that could not be created has nothing to skip.
+    #[must_use]
+    pub fn and_not(mut self, report: Option<&Path>) -> Self {
+        self.skip_file = report.and_then(|r| fs::canonicalize(r).ok());
+        self
+    }
+
+    fn excludes_file(&self, file: &Path) -> bool {
+        self.skip_file.as_deref().is_some_and(|skip| {
+            skip.file_name() == file.file_name() && fs::canonicalize(file).is_ok_and(|f| f == skip)
+        })
     }
 
     fn excludes(&self, dir: &Path) -> bool {
@@ -117,12 +137,49 @@ const TICK: usize = 1024;
 /// thousand or so. A home folder is hundreds of thousands of files, and a
 /// walk that says nothing until it is done reads as a hang.
 pub fn walk_watched(roots: &[PathBuf], options: &Options, watch: &mut dyn FnMut(usize)) -> Walk {
+    walk_seeing(roots, options, &mut |seen| {
+        if let Seen::Listed(n) = seen {
+            watch(n);
+        }
+        true
+    })
+}
+
+/// What a walk tells its visitor, as it happens.
+#[derive(Debug, Clone, Copy)]
+pub enum Seen<'a> {
+    /// How many files are listed so far, every thousand or so.
+    Listed(usize),
+    /// A file, the moment it is listed.
+    File(&'a Path),
+    /// A `.git` directory, listed and not entered.
+    GitDir(&'a Path),
+}
+
+/// The same walk, showing `see` each file and `.git` directory as it is
+/// found, so a check can read the few files that matter most without
+/// waiting for the walk of a whole drive to finish. `see` returning false
+/// stops the walk where it is; what was listed so far is returned. ADR-0059.
+pub fn walk_seeing(
+    roots: &[PathBuf],
+    options: &Options,
+    see: &mut dyn FnMut(Seen) -> bool,
+) -> Walk {
     let mut out = Walk::default();
     for root in roots {
-        match fs::symlink_metadata(root) {
-            Ok(m) if m.is_dir() => descend(root, &mut out, options, watch),
-            Ok(_) => out.files.push(root.clone()),
-            Err(_) => out.unreadable.push(root.clone()),
+        let go = match fs::symlink_metadata(root) {
+            Ok(m) if m.is_dir() => descend(root, &mut out, options, see),
+            Ok(_) => {
+                out.files.push(root.clone());
+                see(Seen::File(root))
+            }
+            Err(_) => {
+                out.unreadable.push(root.clone());
+                true
+            }
+        };
+        if !go {
+            break;
         }
     }
     out.files.sort();
@@ -131,14 +188,20 @@ pub fn walk_watched(roots: &[PathBuf], options: &Options, watch: &mut dyn FnMut(
     out
 }
 
-fn descend(dir: &Path, out: &mut Walk, options: &Options, watch: &mut dyn FnMut(usize)) {
+/// False when the visitor asked to stop.
+fn descend(
+    dir: &Path,
+    out: &mut Walk,
+    options: &Options,
+    see: &mut dyn FnMut(Seen) -> bool,
+) -> bool {
     let entries = match fs::read_dir(dir) {
         Ok(e) => e,
         // An unreadable subdirectory is noted, not fatal: a scan of a backup
         // drive will hit directories the current user cannot open.
         Err(_) => {
             out.unreadable.push(dir.to_path_buf());
-            return;
+            return true;
         }
     };
 
@@ -154,7 +217,11 @@ fn descend(dir: &Path, out: &mut Walk, options: &Options, watch: &mut dyn FnMut(
         }
         if meta.is_dir() {
             if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                let go = see(Seen::GitDir(&path));
                 out.git_dirs.push(path);
+                if !go {
+                    return false;
+                }
                 continue;
             }
             if options.excludes(&path) {
@@ -166,14 +233,24 @@ fn descend(dir: &Path, out: &mut Walk, options: &Options, watch: &mut dyn FnMut(
                 }
                 continue;
             }
-            descend(&path, out, options, watch);
+            if !descend(&path, out, options, see) {
+                return false;
+            }
         } else if meta.is_file() {
+            if options.excludes_file(&path) {
+                continue;
+            }
+            let go = see(Seen::File(&path));
             out.files.push(path);
-            if out.files.len().is_multiple_of(TICK) {
-                watch(out.files.len());
+            if out.files.len().is_multiple_of(TICK) && !see(Seen::Listed(out.files.len())) {
+                return false;
+            }
+            if !go {
+                return false;
             }
         }
     }
+    true
 }
 
 impl Walk {
@@ -190,24 +267,29 @@ impl Walk {
 
     /// Executable, non-sample hook files in every `.git/hooks` found.
     pub fn git_hooks(&self) -> Vec<PathBuf> {
-        let mut hooks = Vec::new();
-        for g in &self.git_dirs {
-            let Ok(entries) = fs::read_dir(g.join("hooks")) else {
-                continue;
-            };
-            for e in entries.flatten() {
-                let p = e.path();
-                if p.extension().and_then(|x| x.to_str()) == Some("sample") {
-                    continue;
-                }
-                if p.is_file() && is_executable(&p) {
-                    hooks.push(p);
-                }
-            }
-        }
+        let mut hooks: Vec<PathBuf> = self.git_dirs.iter().flat_map(|g| hooks_in(g)).collect();
         hooks.sort();
         hooks
     }
+}
+
+/// Executable, non-sample hook files in one `.git/hooks`, sorted.
+pub fn hooks_in(git_dir: &Path) -> Vec<PathBuf> {
+    let mut hooks = Vec::new();
+    let Ok(entries) = fs::read_dir(git_dir.join("hooks")) else {
+        return hooks;
+    };
+    for e in entries.flatten() {
+        let p = e.path();
+        if p.extension().and_then(|x| x.to_str()) == Some("sample") {
+            continue;
+        }
+        if p.is_file() && is_executable(&p) {
+            hooks.push(p);
+        }
+    }
+    hooks.sort();
+    hooks
 }
 
 #[cfg(unix)]

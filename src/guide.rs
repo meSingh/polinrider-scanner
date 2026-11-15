@@ -31,11 +31,12 @@ use crate::host::Host;
 use crate::indicators::Indicators;
 use crate::quarantine::{Apply, DryRun, Quarantine};
 use crate::remote::{Forge, OwnerKind};
-use crate::scan::{self, Scope, Target};
+use crate::report::Report;
+use crate::scan::{self, step_times, Scope, Target};
+use crate::screen::Screen;
 use crate::ui::{text_of, Span, Tone};
 use crate::verdict::{clean, ExitCode, Finding, Kind, Level, Verdict};
 use std::path::{Path, PathBuf};
-use std::time::Instant;
 
 /// Where the session talks and listens.
 pub trait Console {
@@ -48,6 +49,11 @@ pub trait Console {
     /// number of lines; a terminal redraws them in place. `last` is true for
     /// the final call, which is the only one a log or a pipe needs.
     fn progress(&mut self, lines: &[Vec<Span>], last: bool);
+    /// Can lines be drawn over in place? A terminal, yes; a pipe, a log and
+    /// a test, no.
+    fn live(&self) -> bool {
+        false
+    }
 }
 
 /// Everything a session needs that was decided before it started.
@@ -100,6 +106,9 @@ pub(crate) enum Stop {
     Ended,
     /// The operator typed `back`.
     Back,
+    /// A scan was stopped by a signal. What it found is in the report, and
+    /// the stop has been said. ADR-0059.
+    Interrupted,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -320,6 +329,8 @@ pub fn run(session: &Session, io: &mut dyn Console) -> Outcome {
             );
         }
         Err(Stop::Back) => {}
+        // Said by the scan screen; the session is not a clean one.
+        Err(Stop::Interrupted) => worst = Some(ExitCode::CouldNotRun),
     }
 
     let exit = match worst {
@@ -550,6 +561,7 @@ fn local(
         // The dry run is asked what a strip would do, so that the number
         // shown before the question is the number done after it.
         on_infected_config: OnInfectedConfig::Strip,
+        report: Some(session.report),
     };
 
     // --- 3: check, and say what was found -----------------------------------
@@ -573,27 +585,49 @@ fn local(
     }
     blank(io, 2);
     let dry = Quarantine::<DryRun>::new(session.quarantine);
-    let started = Instant::now();
-    let unicode = session.unicode;
-    let found = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |step| {
-        io.progress(
-            &meter(
-                &Meter {
-                    done: step.done,
-                    total: step.total,
-                    now: step.now,
-                    so_far: format!("{} listed", count(step.files, "file", "files")),
-                    found: (step.found > 0)
-                        .then(|| format!("{} confirmed", count(step.found, "finding", "findings"))),
-                },
-                started.elapsed().as_secs(),
-                unicode,
-            ),
-            step.done == step.total,
-        );
+    // Each finding goes to the screen and to the report file the moment it
+    // is made. The full report replaces this file when the session ends.
+    let mut file = Report::create(
+        session.report,
+        "PolinRider guided check, in progress. The full report replaces this when the session ends.\n",
+    );
+    let mut on_screen = Screen::new(&roots, io.live());
+    let mut in_file = Screen::new(&roots, false);
+    let found = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |event| {
+        let frame = on_screen.event(&event);
+        if !frame.lines.is_empty() {
+            // Lines for good go above the region: take it down first.
+            io.progress(&[], false);
+            for l in &frame.lines {
+                io.say(&[p(l.clone())]);
+            }
+        }
+        if !frame.region.is_empty() {
+            let region: Vec<Vec<Span>> = frame.region.iter().map(|l| vec![p(l.clone())]).collect();
+            io.progress(&region, false);
+        }
+        file.lines(&in_file.event(&event).lines);
+        !crate::interrupt::requested()
     });
+    io.progress(&[], true);
+    if let Some(step) = found.stopped() {
+        for l in on_screen.stopped(step) {
+            io.say(&[p(l)]);
+        }
+        file.lines(&in_file.stopped(step));
+        file.write(&format!(
+            "\nfirst check, read-only, stopped\n{}",
+            scan::render(&found, Target::Report)
+        ));
+        report.push_str(&format!(
+            "\nfirst check, read-only, stopped during step {step} of 3\n{}",
+            scan::render(&found, Target::Report)
+        ));
+        return Err(Stop::Interrupted);
+    }
     report.push_str(&format!(
-        "\nfirst check, read-only\n{}{}",
+        "\nfirst check, read-only\n{}{}{}",
+        step_times(&found),
         scan::render(&found, Target::Report),
         scan::result(&found)
     ));
@@ -1653,7 +1687,7 @@ mod tests {
     }
 
     #[test]
-    fn a_folder_check_shows_the_same_progress_screen_as_every_long_job() {
+    fn a_folder_check_shows_its_three_steps_and_each_finding_as_found() {
         let w = World::new(
             "progress",
             &[
@@ -1664,14 +1698,28 @@ mod tests {
         let (_, io) = w.run(&["folder", &w.repo(), "", "no", ""]);
         assert!(io.said.contains("STEP 3 OF 4   Checking the folder"));
         assert!(io.said.contains("  This only reads. Nothing is changed."));
-        assert!(io.said.contains("10 of 10"), "{}", io.said);
-        assert!(io.said.contains("      now        finished"));
-        assert!(io.said.contains("      so far     2 files listed"));
-        assert!(io.said.contains("                 1 finding confirmed"));
+        // ADR-0059: what a pipe gets, step by step and as found.
+        assert!(
+            io.said.contains(
+                "  Step 1 of 3  Things that run by themselves\n    CONFIRMED  a build config carries the payload\n               postcss.config.mjs\n    done, 0s\n"
+            ),
+            "{}",
+            io.said
+        );
+        assert!(io
+            .said
+            .contains("  Step 2 of 3  Project files\n    done, 0s\n"));
+        assert!(io
+            .said
+            .contains("  Step 3 of 3  Large files against known hashes\n    done, 0s\n"));
+        // And the same in the report file, written as it was found.
+        assert!(fs::read_to_string(w.dir.join("home/polinrider-report.txt"))
+            .expect("report")
+            .contains("    CONFIRMED  a build config carries the payload"));
     }
 
     #[test]
-    fn a_scan_says_how_far_it_has_come_before_each_check_and_at_the_end() {
+    fn a_scan_goes_through_three_steps_and_hands_over_each_finding_as_made() {
         let w = World::new("stages", &[("repo/postcss.config.mjs", &infected())]);
         let ind = ind();
         let roots = vec![w.dir.join("repo")];
@@ -1682,18 +1730,43 @@ mod tests {
             home: None,
             host: None,
             on_infected_config: OnInfectedConfig::Report,
+            report: None,
         };
         let dry = Quarantine::<DryRun>::new(&w.quarantine);
-        let mut seen: Vec<(usize, usize, String, usize)> = Vec::new();
-        scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |step| {
-            seen.push((step.done, step.total, step.now.to_string(), step.found));
+        let mut seen: Vec<String> = Vec::new();
+        let v = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |event| {
+            seen.push(match event {
+                scan::Event::Started(n) => format!("start {n}"),
+                scan::Event::Done(n, _) => format!("done {n}"),
+                scan::Event::Found(f) => format!("found {}", f.what()),
+                scan::Event::Count { .. } => return true,
+            });
+            true
         });
-        assert_eq!(seen.first(), Some(&(0, 10, "listing files".to_string(), 0)));
-        assert_eq!(seen.last(), Some(&(10, 10, String::new(), 1)));
-        // Never backwards, and the finding shows up as soon as it is made.
-        assert!(seen.windows(2).all(|w| w[0].0 <= w[1].0));
-        let fonts = seen.iter().find(|s| s.2 == "fonts").expect("fonts stage");
-        assert_eq!((fonts.0, fonts.3), (4, 1));
+        // The config is a step 1 file, so it is found in step 1, before the
+        // project files are read or a single large file hashed.
+        assert_eq!(
+            seen,
+            vec![
+                "start 1",
+                "found config file contains an indicator",
+                "done 1",
+                "start 2",
+                "done 2",
+                "start 3",
+                "done 3",
+            ]
+        );
+        assert_eq!(v.times().len(), 3);
+        assert_eq!(v.stopped(), None);
+
+        // Told to stop in step 2, it stops there and is not a clean result.
+        let v = scan::run_watched(&scope, &mut Sink::Dry(&dry), &mut |event| {
+            !matches!(event, scan::Event::Started(2))
+        });
+        assert_eq!(v.stopped(), Some(2));
+        assert_eq!(v.exit_code(), ExitCode::CouldNotRun);
+        assert_eq!(v.hits(), 1, "what step 1 found is kept");
     }
 
     #[test]

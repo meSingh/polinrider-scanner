@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md), which keeps it and adds the order, streaming, bounded sweep and clean stop |
 | **Date** | 2026-10-03 |
 
 ## Context

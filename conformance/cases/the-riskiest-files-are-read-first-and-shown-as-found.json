@@ -1,0 +1,47 @@
+{
+  "why": "A check of a large drive used to say nothing until every file had been listed, read and hashed, and a 24-hour run that died said nothing at all. Things that run by themselves come first: a folder-open task is read the moment the walk meets it and shown under step 1, before the project files are read in step 2 or a single large file is hashed in step 3. Each finding is on the screen and in the report file as it is made, with the time each step took, and the full report follows at the end as before (ADR-0059).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/.vscode/tasks.json": "{\"tasks\":[{\"runOptions\":{\"runOn\":\"folderOpen\"},\"command\":\"{{STRONG}}\"}]}\n",
+    "code/proj/public/fake.woff2": "var _0x4a=function(){return 1};\n",
+    "code/proj/src/app.js": "export const note = '{{WEAK}}'\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "tasks.json runs on folder open AND contains an indicator",
+        "path": "proj/.vscode/tasks.json"
+      },
+      {
+        "level": "review",
+        "match": "mentions something the campaign also uses",
+        "path": "proj/src/app.js"
+      }
+    ],
+    "print_order": [
+      "Findings are saved as they are found:",
+      "  Step 1 of 3  Things that run by themselves",
+      "    CONFIRMED  an editor task runs the payload when the folder opens",
+      "               proj/.vscode/tasks.json",
+      "    done,",
+      "  Step 2 of 3  Project files",
+      "    CONFIRMED  a font file is really a script",
+      "    TO REVIEW  mentions something the campaign also uses",
+      "    done,",
+      "  Step 3 of 3  Large files against known hashes",
+      "    done,",
+      "== RESULT =="
+    ],
+    "report_must_contain": [
+      "    CONFIRMED  an editor task runs the payload when the folder opens",
+      "    CONFIRMED  a font file is really a script",
+      "== Time per step ==",
+      "  Step 1 of 3  Things that run by themselves",
+      "== RESULT =="
+    ]
+  }
+}

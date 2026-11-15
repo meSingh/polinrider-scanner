@@ -4,14 +4,18 @@
 //! recognise before a single file is read. This binary moves things; a typo
 //! must not get as far as doing work.
 
+use polinrider::awake::Awake;
 use polinrider::checks::{OnInfectedConfig, Sink};
 use polinrider::cli::{self, Command, Rejection};
 use polinrider::guide::{self, Console, Session};
 use polinrider::host::{Host, LiveHost, Snapshot};
 use polinrider::indicators::Indicators;
+use polinrider::interrupt;
 use polinrider::quarantine::{Apply, DryRun, Quarantine};
 use polinrider::remote::{self, Forge, GitHub, Supplied};
-use polinrider::scan::{self, Run, Scope, Target};
+use polinrider::report::Report;
+use polinrider::scan::{self, Event, Run, Scope, Target};
+use polinrider::screen::{Frame, Screen};
 use polinrider::ui::{Span, Ui};
 use polinrider::verdict::ExitCode;
 
@@ -103,6 +107,23 @@ fn main() -> ProcExit {
     let clean = args.command == Command::Clean;
     let out = opening(&args, host);
 
+    // The report is written as the scan goes, so a scan that is stopped or
+    // dies has saved what it found. In the home directory unless told where,
+    // as the guided flow does. ADR-0059.
+    let report_path = args.report.clone().unwrap_or_else(|| {
+        args.home.join(format!(
+            "polinrider-report-{}.txt",
+            polinrider::quarantine::stamp(now())
+        ))
+    });
+    let mut file = Report::create(&report_path, &out);
+    let saved = format!(
+        "\n  Findings are saved as they are found:\n  {}\n",
+        shown(&report_path, &args.home)
+    );
+    emit(&ui.paint(&format!("{out}{saved}")));
+    file.write(&saved);
+
     let scope = Scope {
         roots: &args.roots,
         ioc_dir: &args.ioc,
@@ -114,6 +135,18 @@ fn main() -> ProcExit {
         } else {
             OnInfectedConfig::Report
         },
+        report: Some(&report_path),
+    };
+
+    // Asked not to sleep for as long as the scan runs.
+    let awake = Awake::hold();
+    let mut painter = Painter { ui: &ui, drawn: 0 };
+    let mut on_screen = Screen::new(&args.roots, ui.live);
+    let mut in_file = Screen::new(&args.roots, false);
+    let mut tell = |event: Event| -> bool {
+        painter.frame(&on_screen.event(&event));
+        file.lines(&in_file.event(&event).lines);
+        !interrupt::requested()
     };
 
     let v = if args.apply {
@@ -127,15 +160,31 @@ fn main() -> ProcExit {
                 return ProcExit::from(ExitCode::CouldNotRun.code() as u8);
             }
         };
-        let v = scan::run(&scope, &mut Sink::Apply(&mut q));
+        let v = scan::run_watched(&scope, &mut Sink::Apply(&mut q), &mut tell);
         if let Err(e) = q.write_manifest() {
             eprintln!("polinrider: could not write the quarantine manifest: {e}");
         }
         v
     } else {
         let q = Quarantine::<DryRun>::new(&args.quarantine);
-        scan::run(&scope, &mut Sink::Dry(&q))
+        scan::run_watched(&scope, &mut Sink::Dry(&q), &mut tell)
     };
+    drop(awake);
+    painter.frame(&Frame::default());
+
+    if let Some(step) = v.stopped() {
+        let lines = on_screen.stopped(step);
+        emit(&ui.paint(&format!("{}\n\n", lines.join("\n"))));
+        // The report keeps what the checks that ran concluded, then the stop.
+        file.write(&format!(
+            "{}{}",
+            scan::step_times(&v),
+            scan::render(&v, Target::Report)
+        ));
+        file.lines(&in_file.stopped(step));
+        said_report(&file);
+        return ProcExit::from(v.exit_code().code() as u8);
+    }
 
     let closing = format!(
         "{}{}",
@@ -151,17 +200,69 @@ fn main() -> ProcExit {
             }
         )
     );
-    emit(&ui.paint(&format!(
-        "{out}{}{closing}",
-        scan::render(&v, Target::Console)
-    )));
-    if let Some(path) = &args.report {
-        let body = format!("{out}{}{closing}", scan::render(&v, Target::Report));
-        if let Err(e) = write_report(path, &body) {
-            eprintln!("polinrider: could not write {}: {e}", path.display());
+    emit(&ui.paint(&format!("{}{closing}", scan::render(&v, Target::Console))));
+    file.write(&format!(
+        "{}{}{closing}",
+        scan::step_times(&v),
+        scan::render(&v, Target::Report)
+    ));
+    said_report(&file);
+    ProcExit::from(v.exit_code().code() as u8)
+}
+
+fn now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs())
+}
+
+/// A path under the home directory as `~/...`, anything else whole.
+fn shown(path: &Path, home: &Path) -> String {
+    match path.strip_prefix(home) {
+        Ok(rest) if !rest.as_os_str().is_empty() => format!("~/{}", rest.display()),
+        _ => path.display().to_string(),
+    }
+}
+
+/// A report that could not be written in full is said once, at the end.
+fn said_report(file: &Report) {
+    if let Some(e) = file.error() {
+        eprintln!("polinrider: could not write {}: {e}", file.path().display());
+    }
+}
+
+/// The scan screen on the console: lines for good, and on a live terminal a
+/// region drawn over in place below them.
+struct Painter<'a> {
+    ui: &'a Ui,
+    drawn: usize,
+}
+
+impl Painter<'_> {
+    fn frame(&mut self, frame: &Frame) {
+        let mut out = String::new();
+        if self.drawn > 0
+            && (!frame.lines.is_empty() || !frame.region.is_empty() || frame == &Frame::default())
+        {
+            // Back up over the region and clear to the end of the screen.
+            out.push_str(&format!("\x1b[{}A\x1b[J", self.drawn));
+            self.drawn = 0;
+        }
+        for line in &frame.lines {
+            out.push_str(&self.ui.paint(line));
+            out.push('\n');
+        }
+        if self.ui.live {
+            for line in &frame.region {
+                out.push_str(&self.ui.paint(line));
+                out.push('\n');
+            }
+            self.drawn = frame.region.len();
+        }
+        if !out.is_empty() {
+            emit(&out);
         }
     }
-    ProcExit::from(v.exit_code().code() as u8)
 }
 
 /// The name people call the system this binary was built for.
@@ -279,6 +380,10 @@ struct Terminal {
 }
 
 impl Console for Terminal {
+    fn live(&self) -> bool {
+        self.ui.live
+    }
+
     fn say(&mut self, line: &[Span]) {
         emit(&format!("{}\n", self.ui.line(line)));
     }
@@ -295,8 +400,9 @@ impl Console for Terminal {
         }
         let mut frame = String::new();
         if self.drawn > 0 {
-            // Back up over the previous frame.
-            frame.push_str(&format!("\x1b[{}A", self.drawn));
+            // Back up over the previous frame, and clear what is below: the
+            // next frame may be shorter, or empty.
+            frame.push_str(&format!("\x1b[{}A\x1b[J", self.drawn));
         }
         for line in lines {
             // Clear the line, then draw it.
