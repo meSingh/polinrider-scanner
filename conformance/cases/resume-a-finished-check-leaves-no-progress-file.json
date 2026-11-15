@@ -1,0 +1,20 @@
+{
+  "why": "A check that finishes leaves no progress file: there is nothing left to continue, and a file left behind would offer to continue a check that ended. This tree is large enough for the check to have written one at its first save point (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "5100 JavaScript and TypeScript files read, none carries an indicator"
+    ],
+    "progress_after": "absent"
+  }
+}

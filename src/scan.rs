@@ -12,7 +12,9 @@ use crate::indicators::Indicators;
 use crate::runtimes;
 use crate::verdict::{clean, Entry, Finding, Kind, Level, Verdict};
 use crate::walk;
+use crate::walk::Seen;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 /// What a scan covers.
 pub struct Scope<'a> {
@@ -27,6 +29,11 @@ pub struct Scope<'a> {
     /// checks and says so.
     pub host: Option<&'a dyn Host>,
     pub on_infected_config: OnInfectedConfig,
+    /// This run's report file, written while the scan goes on. Never listed.
+    pub report: Option<&'a Path>,
+    /// Where step 2's pass over the project files picks up, when this check
+    /// continues one that stopped. ADR-0060.
+    pub resume: Option<&'a crate::progress::Resume>,
 }
 
 fn extension_dirs(home: &Path) -> Vec<PathBuf> {
@@ -43,58 +50,87 @@ fn extension_dirs(home: &Path) -> Vec<PathBuf> {
     .collect()
 }
 
-/// How far a scan has come. The same shape for every scan, so that one
-/// progress screen serves all of them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Step<'a> {
-    /// Stages finished, and stages in all.
-    pub done: usize,
-    pub total: usize,
-    /// What is being worked on now. Empty when the scan is finished.
-    pub now: &'a str,
-    /// Files listed so far.
-    pub files: usize,
-    /// Confirmed findings so far.
-    pub found: usize,
+/// The three steps of every scan, riskiest first. ADR-0059.
+pub const STEPS: [&str; 3] = [
+    "Things that run by themselves",
+    "Project files",
+    "Large files against known hashes",
+];
+
+/// What a scan tells whoever is watching, as it happens.
+#[derive(Debug, Clone, Copy)]
+pub enum Event<'a> {
+    /// Step `n` of 3 has started.
+    Started(usize),
+    /// How far the step has come: files listed in step 1, read in step 2,
+    /// hashed in step 3 (`of` is then how many will be).
+    Count {
+        step: usize,
+        n: usize,
+        of: Option<usize>,
+    },
+    /// A confirmed or review finding, the moment it is made.
+    Found(&'a Finding),
+    /// Step `n` has finished, and how long it took.
+    Done(usize, Duration),
+    /// A save point in step 2: every file before `at`, the `n`th, is done,
+    /// and `found` are the files the pass found something in so far. For the
+    /// progress file. ADR-0060.
+    Save {
+        n: usize,
+        at: &'a Path,
+        found: &'a [PathBuf],
+    },
 }
 
-/// Counts the stages of a scan and tells whoever is watching.
-struct Watch<'a> {
-    done: usize,
-    total: usize,
-    files: usize,
-    found: usize,
-    tell: &'a mut dyn FnMut(Step),
+/// Hands findings and progress to the watcher.
+struct Stream<'a> {
+    tell: &'a mut dyn FnMut(Event),
+    step: usize,
+    started: Instant,
 }
 
-impl Watch<'_> {
-    fn say(&mut self, now: &str) {
-        (self.tell)(Step {
-            done: self.done,
-            total: self.total,
-            now,
-            files: self.files,
-            found: self.found,
-        });
+impl Stream<'_> {
+    fn start(&mut self, step: usize) {
+        self.step = step;
+        self.started = Instant::now();
+        (self.tell)(Event::Started(step));
     }
 
-    /// The next stage is starting.
-    fn stage(&mut self, now: &str, v: &Verdict) {
-        self.found = v.hits();
-        self.say(now);
-        self.done += 1;
+    fn flush(&mut self, v: &mut Verdict) {
+        self.found(v.take_fresh());
     }
 
-    /// Within the implant stage: one large file out of how many.
-    fn hashing(&mut self, n: usize, of: usize) {
-        // `stage` has already counted this stage as started.
-        self.done -= 1;
-        self.say(&format!(
-            "large files against known hashes, {} of {of}",
-            n + 1
+    fn found(&mut self, fresh: Vec<Finding>) {
+        for f in &fresh {
+            (self.tell)(Event::Found(f));
+        }
+    }
+
+    fn count(&mut self, n: usize, of: Option<usize>, fresh: Vec<Finding>) {
+        self.found(fresh);
+        let step = self.step;
+        (self.tell)(Event::Count { step, n, of });
+    }
+
+    fn done(&mut self, v: &mut Verdict) {
+        let took = self.started.elapsed();
+        v.timed(STEPS.get(self.step - 1).copied().unwrap_or(""), took);
+        (self.tell)(Event::Done(self.step, took));
+    }
+}
+
+/// How long each step took, as the report says it.
+pub fn step_times(v: &Verdict) -> String {
+    let mut out = String::from("\n== Time per step ==\n");
+    for (i, (name, took)) in v.times().iter().enumerate() {
+        out.push_str(&format!(
+            "  Step {} of 3  {name:<39}{}\n",
+            i + 1,
+            crate::screen::duration(*took)
         ));
-        self.done += 1;
     }
+    out
 }
 
 /// Walk the roots once and run the checks. Whether anything is moved or
@@ -103,30 +139,119 @@ pub fn run(scope: &Scope, sink: &mut Sink) -> Verdict {
     run_watched(scope, sink, &mut |_| {})
 }
 
-/// The same scan, telling `tell` how far it has come: while files are being
-/// listed, before each check, and once more when it is finished.
-pub fn run_watched(scope: &Scope, sink: &mut Sink, tell: &mut dyn FnMut(Step)) -> Verdict {
-    let mut watch = Watch {
-        done: 0,
-        // The walk, then the checks.
-        total: if scope.home.is_some() { 13 } else { 10 },
-        files: 0,
-        found: 0,
+/// The same scan, telling `tell` each step as it starts and ends, each
+/// finding as it is made and how far it has come. There is no way to stop
+/// it part way: a signal ends the process, and what was told before it is
+/// what the report keeps. ADR-0059.
+pub fn run_watched(scope: &Scope, sink: &mut Sink, tell: &mut dyn FnMut(Event)) -> Verdict {
+    let mut s = Stream {
         tell,
+        step: 1,
+        started: Instant::now(),
     };
     let mut v = Verdict::new();
+    steps(scope, sink, &mut s, &mut v);
+    v
+}
+
+/// The three steps.
+fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
+    let ind = scope.ind;
+    let host = scope.host;
+    // One line per host check that did not run, so a section that was skipped
+    // can never be mistaken for one that found nothing.
+    let skipped = |v: &mut Verdict, name: &str| {
+        v.section(format!("{name}: skipped, --fs-only"));
+    };
+
+    // --- step 1: what runs by itself ----------------------------------------
+    // What the machine itself holds comes first: it needs no walk.
+    s.start(1);
+    if let Some(home) = scope.home {
+        checks::implant_installs(
+            ind,
+            &ImplantScope {
+                home: Some(home),
+                ioc_dir: scope.ioc_dir,
+                host,
+            },
+            v,
+            sink,
+        );
+        s.flush(v);
+        if host.is_some() {
+            checks::extensions(&extension_dirs(home), ind, v, sink);
+        } else {
+            skipped(v, "IDE extensions");
+        }
+        checks::ssh_keys(home, ind, v);
+        match host {
+            Some(host) => {
+                host_checks::persistence(host, home, ind, v, sink);
+                host_checks::shell_startup(home, host.platform(), ind, v);
+            }
+            None => {
+                skipped(v, "Persistence");
+                skipped(v, "Shell startup files");
+            }
+        }
+        s.flush(v);
+        match host {
+            Some(host) => {
+                host_checks::npm_config(home, ind, v);
+                runtimes::npm_program(home, host, ind, v, sink);
+                host_checks::interpreters(host, ind, v);
+                host_checks::connections(host, ind, v);
+            }
+            None => {
+                skipped(v, "npm configuration");
+                skipped(v, "npm's own program files");
+                skipped(v, "Resident interpreters");
+                skipped(v, "Live connections");
+            }
+        }
+        s.flush(v);
+    }
+
+    // Then the walk, and the files that run by themselves read the moment it
+    // finds them: a folder-open task, a build config, a git hook. A drive
+    // that takes an hour to list says what it found in the first minute.
+    let mut tasks_v = Verdict::new();
+    let mut configs_v = Verdict::new();
+    let mut hooks_v = Verdict::new();
+    let mut tasks = checks::TasksJson::open(&mut tasks_v);
+    let mut configs = checks::BuildConfigs::open(scope.on_infected_config, &mut configs_v);
+    let mut hooks = checks::GitHooks::open(host, &mut hooks_v);
+    let options = walk::Options::skipping(sink.root()).and_not(scope.report);
+    let w = walk::walk_seeing(scope.roots, &options, &mut |seen| {
+        match seen {
+            Seen::Listed(n) => {
+                s.count(n, None, Vec::new());
+                return;
+            }
+            Seen::File(path) => {
+                if checks::is_tasks_json(path) {
+                    tasks.inspect(path, ind, &mut tasks_v, sink);
+                } else if path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(checks::is_build_config)
+                {
+                    configs.inspect(path, ind, &mut configs_v, sink);
+                } else {
+                    return;
+                }
+            }
+            Seen::GitDir(git_dir) => hooks.inspect(git_dir, ind, &mut hooks_v, sink),
+        }
+        let mut fresh = tasks_v.take_fresh();
+        fresh.extend(configs_v.take_fresh());
+        fresh.extend(hooks_v.take_fresh());
+        if !fresh.is_empty() {
+            s.count(0, None, fresh);
+        }
+    });
     v.section("Filesystem walk");
-    watch.say("listing files");
-    let w = walk::walk_watched(
-        scope.roots,
-        &walk::Options::skipping(sink.root()),
-        &mut |files| {
-            watch.files = files;
-            watch.say("listing files");
-        },
-    );
-    watch.files = w.files.len();
-    watch.done = 1;
     v.set_files(w.files.len());
     v.push(Finding::info(format!(
         "{} files listed. Not walked: {}",
@@ -141,151 +266,60 @@ pub fn run_watched(scope: &Scope, sink: &mut Sink, tell: &mut dyn FnMut(Step)) -
             bad.display()
         )));
     }
+    tasks.finish(&mut tasks_v);
+    let configs_stripped = configs.finish(&mut configs_v) > 0;
+    v.append(tasks_v);
+    v.append(configs_v);
+    v.append(hooks_v);
+    runtimes::python_startup(&w, scope.home, host, ind, v, sink);
+    s.flush(v);
+    s.done(v);
 
-    match scope.home {
-        Some(home) => machine(&w, scope, home, &mut v, sink, &mut watch),
-        None => directories(&w, scope, &mut v, sink, &mut watch),
-    }
-    watch.found = v.hits();
-    watch.done = watch.total;
-    watch.say("");
-    v
-}
-
-/// A machine, or a disk with a home directory on it.
-fn machine(
-    w: &walk::Walk,
-    scope: &Scope,
-    home: &Path,
-    v: &mut Verdict,
-    sink: &mut Sink,
-    watch: &mut Watch,
-) {
-    let (ind, host) = (scope.ind, scope.host);
-    // One line per host check that did not run, so a section that was skipped
-    // can never be mistaken for one that found nothing.
-    let skipped = |v: &mut Verdict, name: &str| {
-        v.section(format!("{name}: skipped, --fs-only"));
-    };
-
-    watch.stage("implant files and processes", v);
-    checks::implants(
-        w,
-        ind,
-        &ImplantScope {
-            home: Some(home),
-            ioc_dir: scope.ioc_dir,
-            host,
-        },
-        v,
-        sink,
-        &mut |n, of| watch.hashing(n, of),
-    );
-
-    watch.stage("editor extensions", v);
-    if host.is_some() {
-        checks::extensions(&extension_dirs(home), ind, v, sink);
-    } else {
-        skipped(v, "IDE extensions");
-    }
-
-    watch.stage("editor tasks", v);
-    checks::tasks_json(w, ind, v, sink);
-    watch.stage("build configs", v);
-    checks::build_configs(w, scope.roots, ind, scope.on_infected_config, v, sink);
-    watch.stage("fonts", v);
-    checks::fonts(w, ind, v, sink);
-
-    watch.stage("the scripts the payload spreads with", v);
-    if host.is_some() {
-        checks::propagation(w, v, sink);
+    // --- step 2: the project files -------------------------------------------
+    s.start(2);
+    checks::fonts(&w, ind, v, sink);
+    // The propagation script is looked for on this computer and in folders;
+    // a disk read with --fs-only from another machine's home is files only.
+    if host.is_some() || scope.home.is_none() {
+        checks::propagation(&w, v, sink);
     } else {
         skipped(v, "Propagation artifact");
     }
-    checks::named_files(w, ind, v, sink);
-
-    watch.stage("packages", v);
-    checks::packages(w, ind, v);
-    runtimes::python_startup(w, Some(home), host, ind, v, sink);
-
-    watch.stage("login items and startup files", v);
-    // A file under the home directory: read on a disk checked with --fs-only
-    // too.
-    checks::ssh_keys(home, ind, v);
-    match host {
-        Some(host) => {
-            host_checks::persistence(host, home, ind, v, sink);
-            host_checks::shell_startup(home, host.platform(), ind, v);
-        }
-        None => {
-            skipped(v, "Persistence");
-            skipped(v, "Shell startup files");
-        }
-    }
-
-    watch.stage("git hooks", v);
-    checks::git_hooks(w, ind, host, v, sink);
-
-    watch.stage("npm settings, running programs and connections", v);
-    match host {
-        Some(host) => {
-            host_checks::npm_config(home, ind, v);
-            runtimes::npm_program(home, host, ind, v, sink);
-            host_checks::interpreters(host, ind, v);
-            host_checks::connections(host, ind, v);
-        }
-        None => {
-            skipped(v, "npm configuration");
-            skipped(v, "npm's own program files");
-            skipped(v, "Resident interpreters");
-            skipped(v, "Live connections");
-        }
-    }
-
-    watch.stage("weak signals", v);
-    checks::weak_signals(w, scope.roots, ind, v);
-
-    watch.stage("keys and passwords kept here", v);
-    // The home directory is swept only when this machine is being read. A
-    // disk checked with --fs-only gets the .env count and nothing more.
-    checks::credentials(w, host.map(|_| home), v);
-}
-
-/// The given directories and nothing else: every check that reads them, and
-/// none that read a home directory or a host.
-fn directories(w: &walk::Walk, scope: &Scope, v: &mut Verdict, sink: &mut Sink, watch: &mut Watch) {
-    let ind = scope.ind;
-    watch.stage("implant files", v);
-    checks::implants(
-        w,
-        ind,
-        &ImplantScope {
-            home: None,
-            ioc_dir: scope.ioc_dir,
-            host: None,
+    checks::named_files(&w, ind, v, sink);
+    checks::packages(&w, ind, v);
+    s.flush(v);
+    let skipped = checks::project_files(
+        &w,
+        &checks::ProjectFiles {
+            roots: scope.roots,
+            on_infected: scope.on_infected_config,
+            configs_stripped,
+            resume: scope.resume,
         },
+        ind,
         v,
         sink,
-        &mut |n, of| watch.hashing(n, of),
+        &mut |pass| match pass {
+            checks::Pass::Count(n, fresh) => s.count(n, None, fresh),
+            checks::Pass::Save { n, at, found } => (s.tell)(Event::Save { n, at, found }),
+        },
     );
-    watch.stage("editor tasks", v);
-    checks::tasks_json(w, ind, v, sink);
-    watch.stage("build configs", v);
-    checks::build_configs(w, scope.roots, ind, scope.on_infected_config, v, sink);
-    watch.stage("fonts", v);
-    checks::fonts(w, ind, v, sink);
-    watch.stage("the scripts the payload spreads with", v);
-    checks::propagation(w, v, sink);
-    checks::named_files(w, ind, v, sink);
-    watch.stage("packages", v);
-    checks::packages(w, ind, v);
-    runtimes::python_startup(w, None, None, ind, v, sink);
-    watch.stage("git hooks", v);
-    checks::git_hooks(w, ind, None, v, sink);
-    watch.stage("weak signals", v);
-    checks::weak_signals(w, scope.roots, ind, v);
-    watch.stage("keys and passwords kept here", v);
-    checks::credentials(w, None, v);
+    if scope.resume.is_some() {
+        v.set_skipped(skipped);
+    }
+    // The home directory is swept only when this machine is being read. A
+    // disk checked with --fs-only gets the .env count and nothing more.
+    checks::credentials(&w, host.and(scope.home), v);
+    s.flush(v);
+    s.done(v);
+
+    // --- step 3: large files against the known hashes -------------------------
+    s.start(3);
+    checks::known_hashes(&w, ind, v, sink, &mut |n, of, fresh| {
+        s.count(n, Some(of), fresh);
+    });
+    s.flush(v);
+    s.done(v);
 }
 
 /// Where a rendering is going. The console gets evidence cut to a readable

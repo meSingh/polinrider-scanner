@@ -1,0 +1,19 @@
+{
+  "why": "A report's first line says the scan is in progress until the verdict is written, so that one left by a killed scan never reads as a result. Once the scan has ended, the finished report replaces that file whole, the same report with its plain title, so the line is not left to contradict the verdict below it. Moved into place in one step: the file is always the one or the other (ADR-0059).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const a = 1\n"
+  },
+  "expect": {
+    "exit": 0,
+    "report_first_line": "PolinRider local check",
+    "report_must_contain": [
+      "== RESULT =="
+    ],
+    "report_must_not_contain": [
+      "in progress"
+    ]
+  }
+}

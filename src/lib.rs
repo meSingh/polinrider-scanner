@@ -5,6 +5,7 @@
 //! An implementation is finished when it agrees with that corpus, not when it
 //! compiles. See ADR-0026.
 
+pub mod awake;
 pub mod checks;
 pub mod cli;
 pub mod guide;
@@ -15,11 +16,14 @@ pub mod host_checks;
 pub mod indicators;
 pub mod manifest;
 pub mod pattern;
+pub mod progress;
 pub mod quarantine;
 pub mod remote;
 pub mod remote_fix;
+pub mod report;
 pub mod runtimes;
 pub mod scan;
+pub mod screen;
 pub mod sha256;
 pub mod strip;
 pub mod ui;

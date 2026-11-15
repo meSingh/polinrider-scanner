@@ -1,0 +1,21 @@
+{
+  "why": "A report that is written only at the end is lost with the run. With no --report given, check saves one in the home directory, as the guided flow does, says where before the first step and adds each finding to it the moment it is made (ADR-0059).",
+  "roots": [
+    "code"
+  ],
+  "no_report": true,
+  "files": {
+    "code/proj/.vscode/tasks.json": "{\"tasks\":[{\"runOptions\":{\"runOn\":\"folderOpen\"},\"command\":\"{{STRONG}}\"}]}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "must_print": [
+      "Findings are saved as they are found:",
+      "  ~/polinrider-report-"
+    ],
+    "report_must_contain": [
+      "    CONFIRMED  an editor task runs the payload when the folder opens",
+      "== RESULT =="
+    ]
+  }
+}

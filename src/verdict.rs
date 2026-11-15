@@ -406,6 +406,14 @@ pub struct Verdict {
     /// How many files the walk listed. Said back to the operator, because
     /// "it was quick" and "it looked at eight files" are the same fact.
     files: usize,
+    /// Confirmed and review findings not yet handed to whoever is watching,
+    /// in the order they were found. A scan streams them as it goes, so a
+    /// process that dies has already saved what it found. ADR-0059.
+    fresh: Vec<Finding>,
+    /// How long each step took, in order.
+    times: Vec<(String, std::time::Duration)>,
+    /// What a check that continued another did not read again. ADR-0060.
+    skipped: Option<crate::progress::Skipped>,
 }
 
 impl Verdict {
@@ -414,7 +422,39 @@ impl Verdict {
     }
 
     pub fn push(&mut self, finding: Finding) {
+        if matches!(finding.level, Level::Hit | Level::Review) {
+            self.fresh.push(finding.clone());
+        }
         self.entries.push(Entry::Finding(finding));
+    }
+
+    /// The confirmed and review findings pushed since the last call, oldest
+    /// first.
+    pub fn take_fresh(&mut self) -> Vec<Finding> {
+        std::mem::take(&mut self.fresh)
+    }
+
+    /// Move another verdict's entries onto the end of this one. Its findings
+    /// not yet taken stay to be taken from this one.
+    pub fn append(&mut self, mut other: Verdict) {
+        self.entries.append(&mut other.entries);
+        self.fresh.append(&mut other.fresh);
+    }
+
+    pub fn timed(&mut self, step: impl Into<String>, took: std::time::Duration) {
+        self.times.push((step.into(), took));
+    }
+
+    pub fn times(&self) -> &[(String, std::time::Duration)] {
+        &self.times
+    }
+
+    pub fn set_skipped(&mut self, skipped: crate::progress::Skipped) {
+        self.skipped = Some(skipped);
+    }
+
+    pub fn skipped(&self) -> Option<crate::progress::Skipped> {
+        self.skipped
     }
 
     /// Start a section. Every check opens one, so a section that prints no

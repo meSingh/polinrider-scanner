@@ -1,0 +1,38 @@
+{
+  "why": "clean is never continued: it strips and moves files, and a half-done clean is safer run again from the start. It neither offers to continue a stopped check nor touches that check's progress file, which a check can still use (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "then": {
+    "command": "clean",
+    "args": []
+  },
+  "expect": {
+    "exit": 0,
+    "must_not_print": [
+      "did not finish",
+      "Continuing the check"
+    ],
+    "progress_after": "present"
+  }
+}

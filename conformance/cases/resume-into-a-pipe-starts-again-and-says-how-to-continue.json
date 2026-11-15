@@ -1,0 +1,42 @@
+{
+  "why": "Into a pipe or a log nobody can answer a question, so a check never asks one there. With neither --resume nor --fresh it starts from the beginning, reads every file, and says how to continue instead: a scheduled check is never silently cut short by an earlier one (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "then": {
+    "args": []
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "  An earlier check of these folders did not finish. Starting again from the",
+      "  beginning. To continue it instead, run the same command with --resume.",
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

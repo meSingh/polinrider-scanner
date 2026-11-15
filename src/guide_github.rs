@@ -1572,7 +1572,9 @@ mod tests {
             "{}",
             io.said
         );
-        assert!(io.said.contains("13 of 13"));
+        assert!(io
+            .said
+            .contains("  Step 3 of 3  Large files against known hashes"));
         assert!(io
             .said
             .contains("      organization   Every repository and branch of a"));

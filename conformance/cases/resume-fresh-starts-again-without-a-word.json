@@ -1,0 +1,43 @@
+{
+  "why": "--fresh starts again from the beginning without the question or a line about the earlier check, reads every file, and removes the earlier progress file so it is not offered again (ADR-0060).",
+  "roots": [
+    "code"
+  ],
+  "many_files": [
+    {
+      "dir": "code/a",
+      "count": 5100,
+      "content": "export const a = 1"
+    }
+  ],
+  "large_files": [
+    {
+      "path": "code/b/big.js",
+      "head": "//",
+      "mb": 20,
+      "fill": "a"
+    }
+  ],
+  "kill": {
+    "signal": "KILL",
+    "in": "progress",
+    "when": "point 5000 "
+  },
+  "then": {
+    "args": [
+      "--fresh"
+    ]
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "5101 JavaScript and TypeScript files read, none carries an indicator",
+      "5100 files read for weak signals, none matched"
+    ],
+    "must_not_print": [
+      "did not finish",
+      "Continuing the check"
+    ],
+    "progress_after": "absent"
+  }
+}

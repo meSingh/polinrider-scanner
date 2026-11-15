@@ -39,6 +39,14 @@ pub const ACCEPTED: &[(&str, &str)] = &[
     ),
     ("--report FILE", "write the full report here"),
     (
+        "--resume",
+        "continue an unfinished check of the same folders",
+    ),
+    (
+        "--fresh",
+        "start again, even if an unfinished check could continue",
+    ),
+    (
         "--ioc DIR",
         "indicator set. Defaults to ioc/ beside the binary",
     ),
@@ -79,13 +87,7 @@ const NOT_IMPLEMENTED: &[(&str, &str)] = &[
 /// Flags 1.x had that 2.0 does not have and will not get. ADR-0030. Still
 /// recognised, so that somebody arriving from 1.x is told what happened to
 /// the flag instead of being told it never existed.
-const REMOVED: &[(&str, &str)] = &[
-    ("--state", "2.0 does not checkpoint a scan"),
-    (
-        "--resume",
-        "2.0 does not checkpoint a scan, so there is nothing to resume",
-    ),
-];
+const REMOVED: &[(&str, &str)] = &[("--state", "2.0 does not checkpoint a scan")];
 
 #[derive(Debug)]
 pub enum Rejection {
@@ -242,6 +244,10 @@ pub struct Args {
     /// their values. Kept so the report can print the exact command to run
     /// next and never one with a blank to fill in.
     pub scope_flags: Vec<(String, Option<String>)>,
+    /// Continue an unfinished check without asking. ADR-0060.
+    pub resume: bool,
+    /// Start again without asking, even if an unfinished check could continue.
+    pub fresh: bool,
 }
 
 /// Parse and validate. Returns only arguments it is safe to act on.
@@ -258,6 +264,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
     let mut host_state = None;
     let mut scope_flags: Vec<(String, Option<String>)> = Vec::new();
     let (mut forge_state, mut evidence) = (None, None);
+    let (mut resume, mut fresh) = (false, false);
 
     // The subcommand, when present. `check` is the default.
     let command = match args.peek().map(String::as_str) {
@@ -317,6 +324,22 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
             "--quarantine" => {
                 not_for_purge("--quarantine")?;
                 quarantine = Some(PathBuf::from(value("--quarantine")?));
+            }
+            // A check that stopped is continued only by a check (ADR-0060).
+            // clean starts again: a half-done clean is safer redone.
+            "--resume" => {
+                not_for(
+                    "--resume",
+                    &[Command::Clean, Command::Guide, Command::PurgeEvidence],
+                )?;
+                resume = true;
+            }
+            "--fresh" => {
+                not_for(
+                    "--fresh",
+                    &[Command::Clean, Command::Guide, Command::PurgeEvidence],
+                )?;
+                fresh = true;
             }
             "--report" => {
                 not_for_purge("--report")?;
@@ -451,6 +474,22 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         }
     }
 
+    if resume && fresh {
+        return Err(Rejection::Conflict {
+            first: "--resume".into(),
+            second: "--fresh".into(),
+            why: "one continues an earlier check and the other starts again".into(),
+        });
+    }
+    if apply && (resume || fresh) {
+        return Err(Rejection::Conflict {
+            first: "--apply".into(),
+            second: if resume { "--resume" } else { "--fresh" }.into(),
+            why: "a check that moves files is never continued, it always starts from the beginning"
+                .into(),
+        });
+    }
+
     if let Some(dir) = &host_state {
         if fs_only {
             return Err(Rejection::Conflict {
@@ -480,6 +519,8 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         forge_state,
         evidence,
         scope_flags,
+        resume,
+        fresh,
     })
 }
 
@@ -611,14 +652,45 @@ mod tests {
     fn a_flag_removed_in_2_0_says_it_was_removed() {
         // The whole point: --state used to be accepted and silently dropped,
         // and a scan that started over looked like one that had resumed.
-        for flag in ["--state", "--resume"] {
-            let ioc = ioc_fixture("removed");
-            let e =
-                parse(args(&[flag, "/tmp/s", "/tmp"]).into_iter(), ioc).expect_err("must refuse");
-            assert!(matches!(e, Rejection::Removed { flag: ref f, .. } if f == flag));
-            let msg = e.to_string();
-            assert!(msg.contains("was removed in 2.0"), "{msg}");
-            assert!(msg.contains("Nothing was scanned"), "{msg}");
+        let flag = "--state";
+        let ioc = ioc_fixture("removed");
+        let e = parse(args(&[flag, "/tmp/s", "/tmp"]).into_iter(), ioc).expect_err("must refuse");
+        assert!(matches!(e, Rejection::Removed { flag: ref f, .. } if f == flag));
+        let msg = e.to_string();
+        assert!(msg.contains("was removed in 2.0"), "{msg}");
+        assert!(msg.contains("Nothing was scanned"), "{msg}");
+    }
+
+    #[test]
+    fn resume_and_fresh_are_for_a_check_that_moves_nothing() {
+        let ioc = ioc_fixture("resume");
+        let a = parse(args(&["--resume", "/tmp"]).into_iter(), ioc.clone()).expect("accepted");
+        assert!(a.resume && !a.fresh);
+        assert_eq!(
+            a.roots,
+            vec![PathBuf::from("/tmp")],
+            "--resume takes no value"
+        );
+        let a = parse(args(&["check", "--fresh", "/tmp"]).into_iter(), ioc.clone()).expect("ok");
+        assert!(a.fresh && !a.resume);
+        for argv in [
+            vec!["clean", "--resume", "/tmp"],
+            vec!["clean", "--fresh", "/tmp"],
+            vec!["guide", "--resume"],
+        ] {
+            let e = parse(args(&argv).into_iter(), ioc.clone()).expect_err("must refuse");
+            assert!(
+                matches!(e, Rejection::NotForCommand { .. }),
+                "{argv:?}: {e:?}"
+            );
+        }
+        for argv in [
+            vec!["--resume", "--fresh", "/tmp"],
+            vec!["--apply", "--resume", "/tmp"],
+            vec!["--apply", "--fresh", "/tmp"],
+        ] {
+            let e = parse(args(&argv).into_iter(), ioc.clone()).expect_err("must refuse");
+            assert!(matches!(e, Rejection::Conflict { .. }), "{argv:?}: {e:?}");
         }
     }
 

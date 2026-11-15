@@ -20,7 +20,7 @@
     "findings": [
       {
         "level": "ok",
-        "match": "no second-stage implant found"
+        "match": "no second-stage implant at its install paths, and none running"
       },
       {
         "level": "ok",
@@ -37,6 +37,10 @@
       {
         "level": "ok",
         "match": "no established node or Electron TCP connections"
+      },
+      {
+        "level": "ok",
+        "match": "no file under the scanned paths matches a known implant hash"
       }
     ],
     "must_not_report": [

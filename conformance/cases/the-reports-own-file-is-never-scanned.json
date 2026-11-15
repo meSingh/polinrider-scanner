@@ -1,0 +1,27 @@
+{
+  "why": "The report is written while the scan runs, and it can sit inside the folder being scanned. Read as a project file it would quote the weak signal it reported and be reported for it, a finding of the tool's own making. This run's report is never listed, wherever it is (ADR-0059).",
+  "roots": [
+    "code"
+  ],
+  "report_in_tree": "code/polinrider-report.txt",
+  "files": {
+    "code/a/x.js": "export const note = '{{WEAK}}'\n"
+  },
+  "expect": {
+    "exit": 1,
+    "tree_may_change": true,
+    "findings": [
+      {
+        "level": "review",
+        "match": "mentions something the campaign also uses",
+        "path": "a/x.js"
+      }
+    ],
+    "must_not_report": [
+      "polinrider-report.txt"
+    ],
+    "report_must_contain": [
+      "    TO REVIEW  mentions something the campaign also uses"
+    ]
+  }
+}

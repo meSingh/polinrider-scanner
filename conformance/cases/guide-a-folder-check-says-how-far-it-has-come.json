@@ -1,5 +1,5 @@
 {
-  "why": "A check that prints nothing while it works reads as a hang, and somebody who thinks the tool has hung stops it. Checking a folder shows the same progress screen as checking GitHub: how many stages are done, what it is on, how many files it has listed and what it has found. Into a pipe it is printed once, finished, and not as a frame per file.",
+  "why": "A check that prints nothing while it works reads as a hang, and somebody who thinks the tool has hung stops it. Checking a folder goes through the same three steps as every scan, riskiest first, and says each finding the moment it is made under the step that made it: the infected build config here is a step 1 file, so it is shown before the project files are read. Into a pipe each step is printed as it starts and ends, and nothing is drawn over (ADR-0059).",
   "command": "guide",
   "roots": [
     "code"
@@ -20,15 +20,21 @@
     "tree_may_change": false,
     "must_print": [
       "Checking the folder",
-      "This only reads. Nothing is changed.",
-      "10 of 10",
-      "now        finished",
-      "so far     2 files listed",
-      "1 finding confirmed"
+      "This only reads. Nothing is changed."
     ],
     "must_not_print": [
       "0 of 9",
       "listing files"
+    ],
+    "print_order": [
+      "  Step 1 of 3  Things that run by themselves",
+      "    CONFIRMED  a build config carries the payload",
+      "               proj/postcss.config.mjs",
+      "    done,",
+      "  Step 2 of 3  Project files",
+      "    done,",
+      "  Step 3 of 3  Large files against known hashes",
+      "    done,"
     ]
   }
 }

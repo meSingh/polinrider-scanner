@@ -289,6 +289,13 @@ impl Ui {
         if line.starts_with("       polinrider ") {
             return self.wrap(&[CYAN, BOLD], line);
         }
+        // The scan screen (ADR-0059): a finding the moment it is made.
+        if line.starts_with("    CONFIRMED  ") {
+            return self.wrap(&[RED, BOLD], line);
+        }
+        if let Some(rest) = line.strip_prefix("    TO REVIEW") {
+            return format!("{}{rest}", self.wrap(&[YELLOW, BOLD], "    TO REVIEW"));
+        }
         if line.contains("QUARANTINE FAILED") || line.contains("STRIP FAILED") {
             // Not red: red is the finding. This is the tool failing to deal
             // with one, which needs a person.
