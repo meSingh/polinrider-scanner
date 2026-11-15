@@ -85,8 +85,38 @@ is read for the packages it installs, and each name is compared whole, so a
 package whose name merely starts with a campaign one is not reported. One that
 cannot be read is matched as text and listed for review.
 
-A long check shows how far it has come. 2.0 does not checkpoint a scan: there
-is no `--resume`. An interrupted check starts again from the beginning.
+A check goes in three steps, riskiest first:
+
+1. **Things that run by themselves.** The implant, what starts by itself,
+   editor tasks, build configs and git hooks, read as the walk meets them. A
+   drive that takes an hour to list says what it found in the first minute.
+2. **Project files.** Every JavaScript and TypeScript file and every small
+   file, for the payload and for weak signals. On a large drive this is the
+   long step.
+3. **Large files against known hashes.** Only files that start like a program
+   are hashed. Every known hash of that size is a program, so the others
+   cannot match.
+
+Each finding is shown and written to the report the moment it is found. The
+report is saved to the disk line by line, so a check that is stopped or loses
+power keeps what it found. Until the check finishes, the report's first line
+says it is in progress and has no result. While a check runs the computer is
+kept from sleeping, on macOS and on Linux with systemd; not yet on Windows.
+
+### Continuing a check that stopped
+
+A check saves its place every 5,000 files in step 2, in a small file beside
+the report. Run the same command again and it asks whether to continue from
+where it stopped. Steps 1 and 3 run again in full. Step 2 goes back a little
+before the stop, and every file that had a finding is read again, so the
+result comes only from this run.
+
+`--resume` continues without asking and `--fresh` starts again. Into a pipe it
+never asks: it starts again and says how to continue.
+
+A check is continued only when it was made by the same version, with the same
+indicators, folders and options. Otherwise it starts from the beginning and
+says why. `clean` and `check --apply` always start from the beginning.
 
 ## Exit codes
 

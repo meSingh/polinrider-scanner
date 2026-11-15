@@ -1,0 +1,58 @@
+---
+title: PolinRider Scanner and Cleaner 3.1.0
+description: A check of a large drive looks at the riskiest places first, saves each finding as it is found and can continue from where it stopped.
+version: "3.1.0"
+# The expected release day. Once the tag exists the site shows the tag's date
+# instead, so this never needs correcting after the release.
+date: "2026-11-16"
+---
+
+import Downloads from '~/components/Downloads.astro';
+import Released from '~/components/Released.astro';
+import RunBlock from '~/components/RunBlock.astro';
+
+<Released version="3.1.0" date="2026-11-16" /> No breaking changes.
+
+## New
+
+- **A check that stopped can be continued.** A check of a 700 GB backup ran
+  for a day and was lost when the laptop's battery died. A check now saves
+  its place as it goes. Run the same command again and it asks whether to
+  continue from where it stopped. The quick checks run again in full, the
+  long one goes back a little before the stop, and the result comes only from
+  the new run. `--resume` continues without asking and `--fresh` starts again.
+- **Findings are shown and saved the moment they are found.** The report is
+  written to the disk line by line, so a check that is stopped or loses power
+  keeps everything it found. Until the check finishes, the report says it is
+  in progress and has no result.
+- **The computer is kept awake while a check runs,** on macOS and on Linux
+  with systemd. Not yet on Windows.
+- **The report says how long each step took.**
+
+## Changed
+
+- **A check goes riskiest first, in three steps:** things that run by
+  themselves, then project files, then large files against known hashes. A
+  drive that takes an hour to list says what it found in the first minute.
+- **Only large files that start like a program are hashed.** Every known
+  hash of that size is a program, so the others cannot match. On our test
+  tree a whole check took 10 seconds instead of 50.
+- The report's "Second-stage implant" section is now two: the implant's
+  install paths and process, and a separate "Large files against known
+  hashes" section.
+
+## Breaking changes
+
+None. Exit codes, commands and flags are as in the previous release.
+`--resume` was refused since 2.0 and works again.
+
+## Download
+
+<Downloads version="3.1.0" packages />
+
+Or use a package manager. Choose your system, then run only its commands:
+
+<RunBlock />
+
+[Verify what you downloaded](/docs/reference/verifying/) before
+you run it.
