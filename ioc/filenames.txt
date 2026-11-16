@@ -51,3 +51,20 @@
 # Source: OpenSSF malicious-packages MAL-2026-16154 (`pino-ulid`; Amazon
 # Inspector, SafeDep), September 2026. See docs-site/src/content/docs/indicator-reviews/2026-10-19.md.
 (^|/)com\.launchkeeper\.pkg-agent\.plist$
+# The npm persistence runner of the November 2026 loaders, by name, so that it
+# is found on a copied home directory or a backup drive as well as at the path
+# implant-paths.txt checks on this computer.
+# Source: Greenflagged, "@adminide-stack npm compromise", 2026-11-03, updated
+# 2026-11-04; GitGuardian, 2026-10-27.
+# See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.
+(^|/)\.npm-ws-runner\.js$
+# The side file the second stage leaves beside each editor or app startup file
+# it patches: the loader copy the patched file loads. .inz.orig and .inz.tmp,
+# left by the same injection, are in filenames-review.txt.
+# Source: Greenflagged, as above; Abnormal AI, 2026-11-12.
+\.inz\.cjs$
+# The fake-font payload under a second extension that is not a font format,
+# beside the .llf form above.
+# Source: GitGuardian, "GhostAction Crosses Paths With PolinRider: Inside the
+# October Escalation", 2026-10-27.
+(^|/)fa-solid\.lkf$

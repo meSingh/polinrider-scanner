@@ -399,10 +399,10 @@ weeks that found nothing. Each review keeps its own dated entry, and entries are
 never edited or removed:
 [the indicator reviews](https://polinriderscanner.com/indicator-reviews/).
 
-**Last reviewed: [9 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-09/).**
+**Last reviewed: [16 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-16/).**
 
-No change this week. The dossier has not moved since July, and the OpenSSF records
-that quote the campaign carry no name this set lacks.
+38 indicators added: a third operator wallet, its C2 addresses, and the files and markers
+of a second stage that patches npm and the editor so it runs again after a cleanup.
 
 From 2.3.0, the folder and computer checks read `weak.txt` too (ADR-0047).
 Up to 2.2.0, review-tier indicators reach only the CI scanner and the GitHub
