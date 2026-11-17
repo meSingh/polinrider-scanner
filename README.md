@@ -401,7 +401,7 @@ never edited or removed:
 
 **Last reviewed: [16 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-16/).**
 
-38 indicators added: a third operator wallet, its C2 addresses, and the files and markers
+38 indicators added: a third operator wallet, its C2 addresses and the files and markers
 of a second stage that patches npm and the editor so it runs again after a cleanup.
 
 From 2.3.0, the folder and computer checks read `weak.txt` too (ADR-0047).
