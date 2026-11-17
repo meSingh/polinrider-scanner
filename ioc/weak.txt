@@ -117,3 +117,20 @@ hex-type
 # <https://x.com/MsftSecIntel/status/2062013269687054695>.
 # See docs-site/src/content/docs/indicator-reviews/2026-10-21.md.
 logger-active
+
+# The second-stage request paths of the November 2026 loaders, beside /0x/cls
+# and /0x/ls above: the fallback paths for the remote-access tool and for the
+# re-obfuscated loader, the JSON that carries both, and the script that patches
+# npm. Review tier for the same reason as the two above; /0x/npm-migrate is
+# specific, but it is fetched by a stage that is served and never written to a
+# file, so a match is a mention, not a payload. /verify-human, the reporting
+# path, is deliberately absent: it is a route an ordinary web application can
+# have.
+# Sources: Greenflagged, "@adminide-stack npm compromise", 2026-11-03, updated
+# 2026-11-04; GitGuardian, "GhostAction Crosses Paths With PolinRider: Inside
+# the October Escalation", 2026-10-27 (/0x/js).
+# See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.
+/0x/js
+/0x/clb
+/0x/cb
+/0x/npm-migrate

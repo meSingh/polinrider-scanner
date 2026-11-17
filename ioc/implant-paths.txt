@@ -54,3 +54,20 @@
 # Inspector, SafeDep), September 2026.
 # See docs-site/src/content/docs/indicator-reviews/2026-10-19.md.
 ~/Library/LaunchAgents/com.launchkeeper.pkg-agent.plist
+
+# --- persistence through npm, written by the /0x/npm-migrate stage of the
+# November 2026 loaders: a runner that refetches the loader, its configuration
+# (the C2 addresses), its pid and its error log. Every npm command restarts the
+# runner from the snippet appended to npm's lib/cli.js, which the npm
+# program-file check reads. The 2026-10-05 entry left ~/.node_modules itself
+# out as a directory a developer could create; these are files inside it that
+# nothing else writes.
+# Sources: Greenflagged, "@adminide-stack npm compromise", 2026-11-03, updated
+# 2026-11-04 (all four); GitGuardian, "GhostAction Crosses Paths With
+# PolinRider: Inside the October Escalation", 2026-10-27 (the first three);
+# Abnormal AI, 2026-11-12 (~/.node_modules/.npm-ws*).
+# See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.
+~/.node_modules/.npm-ws-runner.js
+~/.node_modules/.npm-ws.json
+~/.node_modules/.npm-ws.pid
+~/.node_modules/.npm-ws.log

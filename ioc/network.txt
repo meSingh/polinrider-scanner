@@ -83,3 +83,30 @@ copilot-ai.whisdev.org
 # Source: Island, "How Attackers Built Software an AI Would Recommend", indicator
 # table, October 2026. See docs-site/src/content/docs/indicator-reviews/2026-11-02.md.
 65.21.30.171
+
+# --- the 0x1eef dead-drop rotation: every server that wallet has advertised
+# since 2026-09-04, decoded from the recipient bytes of its transactions.
+# 166.88.134.75, its first, is already above from the 0xa322 rotation, so the
+# two wallets share infrastructure. 95.135.181.151 has been current since
+# 2026-10-16 and is also the address hardcoded in the npm persistence script;
+# it answers plain HTTP on ports 443 and 80.
+# Sources: Greenflagged, "@adminide-stack npm compromise", 2026-11-03, updated
+# 2026-11-04 (all three); GitGuardian, 2026-10-27, Sonatype, 2026-11-04, and
+# Abnormal AI, 2026-11-12 (95.135.181.151); StepSecurity, 2026-11-13
+# (23.27.13.72). See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.
+95.135.181.151
+103.179.143.219
+23.27.13.72
+
+# --- the newest server on the 0xa322 wallet, in the /24 next to that of
+# 103.179.143.219 above. Abnormal AI recovered it from the loaders in two fake
+# coding-assignment repositories; StepSecurity decoded it from the wallet.
+# Sources: Abnormal AI, "PolinRider: How Malicious Coding Assignments Steal
+# Developer Secrets and Backdoor Their Tools", 2026-11-12; StepSecurity, "The
+# Take-Home Test That Runs on Your Work Laptop", 2026-11-13.
+103.179.142.155
+
+# --- the fake hiring company's careers site and payload server.
+# Source: JFrog Security Research, "Contagious Interview: One Interview Away
+# From Infection", November 2026.
+accurasofthire.com
