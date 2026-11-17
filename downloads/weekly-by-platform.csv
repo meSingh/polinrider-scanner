@@ -32,3 +32,13 @@ before 2026-11-05,windows-x86_64.zip,25,0,25
 2026-11-09,source.tar.gz,4,0,4
 2026-11-09,windows-x86_64.tar.gz,10,0,10
 2026-11-09,windows-x86_64.zip,19,0,19
+2026-11-16,1.x shell,1,0,1
+2026-11-16,checksums and attestations,5,0,5
+2026-11-16,linux-arm64.deb,1,0,1
+2026-11-16,linux-arm64.tar.gz,1,0,1
+2026-11-16,linux-x86_64.deb,3,0,3
+2026-11-16,linux-x86_64.tar.gz,3,0,3
+2026-11-16,macos-arm64.tar.gz,4,0,4
+2026-11-16,macos-x86_64.tar.gz,1,0,1
+2026-11-16,source.tar.gz,2,0,2
+2026-11-16,windows-x86_64.zip,1,0,1
