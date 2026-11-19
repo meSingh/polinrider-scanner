@@ -235,3 +235,10 @@ date,tag,file,total
 2026-11-18,v3.1.0,polinrider-v3.1.0-source.tar.gz,21
 2026-11-18,v3.1.0,polinrider-v3.1.0-windows-x86_64.zip,15
 2026-11-18,v3.1.0,polinrider-v3.1.0.intoto.jsonl,3
+2026-11-19,v3.1.0,SHA256SUMS,24
+2026-11-19,v3.1.0,polinrider-v3.1.0-linux-x86_64.deb,6
+2026-11-19,v3.1.0,polinrider-v3.1.0-linux-x86_64.tar.gz,9
+2026-11-19,v3.1.0,polinrider-v3.1.0-macos-arm64.tar.gz,20
+2026-11-19,v3.1.0,polinrider-v3.1.0-source.tar.gz,58
+2026-11-19,v3.1.0,polinrider-v3.1.0-windows-x86_64.zip,32
+2026-11-19,v3.1.0,polinrider-v3.1.0.intoto.jsonl,8
