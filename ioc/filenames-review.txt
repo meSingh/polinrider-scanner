@@ -43,8 +43,9 @@
 # GhostAction commits from 2026-10-22 to 2026-10-26 use fa-solid-300.ttf. The
 # same reasoning as the .woff2 entry above: Font Awesome's solid style ships
 # one weight, 900, so a solid .ttf named for another weight is not Font
-# Awesome's. Review tier because the font check does not read .ttf files, so
-# nothing confirms this one by its first bytes.
+# Awesome's. From 3.2 the font check reads .ttf files too, so a fake one is
+# confirmed by its first bytes (ADR-0065); the name stays at the review tier,
+# as the .woff2 entry does, for a real font carrying an impossible weight.
 # Source: GitGuardian, "GhostAction Crosses Paths With PolinRider: Inside the
 # October Escalation", 2026-10-27.
 # See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0065](./0065-a-font-is-read-whatever-font-extension-it-has.md), which reads `.ttf` and `.otf` fonts too and hashes those only up to 4 MB |
 | **Date** | 2026-10-25 |
 
 ## Context

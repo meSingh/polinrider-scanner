@@ -1,0 +1,56 @@
+{
+  "why": "Reading .ttf and .otf files means reading fonts almost every project ships, so every real one must stay quiet: TrueType with 00 01 00 00 and with Apple's true, OpenType with OTTO, an upper-case name, and the review's exit-0 fixtures fa-solid-900.ttf (the real weight) and fa-solid.ttf (no weight). The 6 MB font is over the 4 MB limit, so only its first bytes are read and it is not hashed (ADR-0065); real CJK fonts run to tens of megabytes.",
+  "roots": [
+    "code"
+  ],
+  "large_files": [
+    {
+      "path": "code/proj/assets/fonts/Inter.ttf",
+      "head": "\\x00\\x01\\x00\\x00",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/assets/fonts/Menlo.ttf",
+      "head": "true",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/assets/fonts/Inter.otf",
+      "head": "OTTO",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/assets/fonts/LOGO.TTF",
+      "head": "\\x00\\x01\\x00\\x00",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/public/fonts/fa-solid-900.ttf",
+      "head": "\\x00\\x01\\x00\\x00",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/public/fonts/fa-solid.ttf",
+      "head": "\\x00\\x01\\x00\\x00",
+      "mb": 0
+    },
+    {
+      "path": "code/proj/assets/fonts/NotoSansCJK.ttf",
+      "head": "\\x00\\x01\\x00\\x00",
+      "mb": 6
+    }
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "7 font files checked, all are real fonts"
+    ],
+    "must_not_report": [
+      "[HIT]",
+      "[review]"
+    ]
+  }
+}

@@ -677,6 +677,30 @@ mod tests {
         }
     }
 
+    /// The task command that runs a fake font, against the shipped `ioc/`:
+    /// any font or fake-font extension, with or without the weight. ADR-0065.
+    #[test]
+    fn node_running_a_font_of_any_font_extension_is_confirmed() {
+        let ind = Indicators::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("ioc"))
+            .expect("the shipped indicator set loads");
+        for confirmed in [
+            r#""command": "node ./public/fonts/fa-solid-300.ttf""#,
+            r#""command": "node public/fonts/fa-solid.lkf""#,
+            r#""command": "node  ./fonts/fa-solid-500.woff""#,
+            r#""command": "node /tmp/fa-solid-900.otf""#,
+        ] {
+            assert!(ind.has_strong(confirmed), "{confirmed}");
+        }
+        for not_confirmed in [
+            "node scripts/copy.js fa-solid-300.ttf",
+            "node ./fonts/fa-solid.js",
+            "node ./fonts/fa-solid-300.json",
+            "cp ./fonts/fa-solid-300.ttf dist/",
+        ] {
+            assert!(!ind.has_strong(not_confirmed), "{not_confirmed}");
+        }
+    }
+
     /// The second npm variant's tag, inserted as its own lines with no
     /// padding, before the six-number NX table. Only the two together.
     #[test]

@@ -60,7 +60,7 @@ If you disagree with one, open an issue and quote its number.
 | [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed |
 | [0043](./0043-packages-use-layouts-the-binary-already-searches-and-are-bumped-by-pull-request.md) | Package in layouts the binary already searches, and bump by pull request | Accepted |
 | [0044](./0044-a-guided-session-ends-on-what-it-came-to-and-offers-the-next-check.md) | End a guided session on what it came to, and offer the next check | Accepted |
-| [0045](./0045-small-files-the-checks-read-are-compared-by-hash.md) | Compare the small files the checks read against the known hashes | Accepted |
+| [0045](./0045-small-files-the-checks-read-are-compared-by-hash.md) | Compare the small files the checks read against the known hashes | Accepted; amended by [ADR-0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) |
 | [0046](./0046-purge-evidence-deletes-only-polinriders-own-copies.md) | Let `--purge-evidence` delete polinrider's own copies, and nothing else | Accepted |
 | [0047](./0047-the-folder-and-computer-checks-read-weak-txt.md) | The folder and computer checks read `weak.txt` | Accepted |
 | [0048](./0048-a-review-level-filename-list.md) | Add a review-level filename list | Accepted |
@@ -76,6 +76,7 @@ If you disagree with one, open an issue and quote its number.
 | [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
 | [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
 | [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
+| [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 
 ## Adding one
 

@@ -11,11 +11,16 @@
 # the 400 form as a fixed string; the 500 and 900 forms are live. The path must
 # follow node as one argument, so a script that is merely handed a font name
 # (node scripts/copy.js fa-solid-900.woff2) does not match.
+# From 3.2 any font or fake-font extension, with or without the weight: the
+# October 2026 loaders run node ./public/fonts/fa-solid-300.ttf and
+# fa-solid.lkf. Only those extensions, so node ./fa-solid.js does not match.
+# ADR-0065.
 # Source: OpenSourceMalware, "A Developer's Guide to Getting Rid of
 # PolinRider", 2026-08-13, and "PolinRider is A/B Testing its Way Past Your
 # Detections", September 2026; recorded in the 2026-09-14 and 2026-09-28
-# indicator reviews.
-node +[^ "']*fa-solid-[0-9]{3}\.woff2
+# indicator reviews. GitGuardian, "GhostAction Crosses Paths With PolinRider:
+# Inside the October Escalation", 2026-10-27 (the .ttf and .lkf forms).
+node +[^ "']*fa-solid(-[0-9]{3})?\.(woff2?|ttf|otf|eot|lkf|llf)
 
 # The var z campaign tag, behind the padding: the first statement of the hex
 # blob and var NX table payloads, appended to the last line of a config or

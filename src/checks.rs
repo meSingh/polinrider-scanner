@@ -619,23 +619,55 @@ fn show_cut(plan: &Plan, v: &mut Verdict) {
     ));
 }
 
+/// What a font file of each kind the font check reads really starts with.
+/// Web fonts open `wOFF` or `wOF2`; TrueType and OpenType open with the
+/// version number `00 01 00 00`, or `true`, `OTTO` or `typ1`. ADR-0065.
+pub const TRUETYPE_MAGIC: &[&[u8]] = &[b"\x00\x01\x00\x00", b"true", b"OTTO", b"typ1"];
+
+/// Is this a TrueType or OpenType font by its name, in lower case? The
+/// October 2026 loaders moved from `.woff2` to `fa-solid-300.ttf`.
+pub fn is_truetype_name(lower: &str) -> bool {
+    lower.ends_with(".ttf") || lower.ends_with(".otf")
+}
+
+/// A TrueType or OpenType font larger than this is read for its first bytes
+/// only, and not hashed: real ones run to tens of megabytes, and every
+/// published fake font is under one. ADR-0065.
+pub const TRUETYPE_HASH_MAX: u64 = 4 * 1024 * 1024;
+
 pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
     v.section("Font files that are not fonts");
     let mut seen = 0usize;
     let mut flagged = 0usize;
 
-    for path in
-        walk.by_name(|n| (n.ends_with(".woff") || n.ends_with(".woff2")) && !n.starts_with("._"))
-    {
+    for path in walk.by_name(|n| {
+        let lower = n.to_ascii_lowercase();
+        (lower.ends_with(".woff") || lower.ends_with(".woff2") || is_truetype_name(&lower))
+            && !n.starts_with("._")
+    }) {
         if path.components().any(|c| c.as_os_str() == "__MACOSX") {
             continue;
         }
         seen += 1;
-        let Ok(bytes) = fs::read(path) else { continue };
+        let truetype = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| is_truetype_name(&n.to_ascii_lowercase()));
+        let large = truetype && fs::metadata(path).is_ok_and(|m| m.len() > TRUETYPE_HASH_MAX);
+        let bytes = if large {
+            // Its first four bytes decide; too large to be a published fake.
+            match first_bytes(path) {
+                Some(head) => head.to_vec(),
+                None => continue,
+            }
+        } else {
+            let Ok(bytes) = fs::read(path) else { continue };
+            bytes
+        };
 
         // A published fake font, by its hash: named, and caught even if it
         // ever starts with a font's magic bytes. ADR-0045.
-        if let Some(label) = ind.known_file(&bytes) {
+        if let Some(label) = (!large).then(|| ind.known_file(&bytes)).flatten() {
             flagged += 1;
             let line = sink.take(path, "font-masquerade");
             v.push(
@@ -663,7 +695,12 @@ pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
             // a confirmed hit either. The shell skips these too.
             continue;
         };
-        if magic == b"wOFF" || magic == b"wOF2" || magic == b"vers" {
+        let real = if truetype {
+            TRUETYPE_MAGIC.contains(&magic)
+        } else {
+            magic == b"wOFF" || magic == b"wOF2" || magic == b"vers"
+        };
+        if real {
             continue;
         }
 
@@ -1534,6 +1571,51 @@ mod tests {
                 && m.starts_with("config file matches a known campaign file (config fixture): ")));
         // None of the three is a sign that the payload ran on this machine.
         assert!(hits.iter().all(|(k, _)| !k.is_some_and(Kind::ran_here)));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn truetype_and_opentype_fonts_are_read_and_a_large_one_only_by_its_head() {
+        let dir = scratch("truetype");
+        let fake = dir.join("repo/public/fonts/fa-solid-300.ttf");
+        let upper = dir.join("repo/public/fonts/BRAND.TTF");
+        let real = dir.join("repo/public/fonts/inter.ttf");
+        let otf = dir.join("repo/public/fonts/inter.otf");
+        let mac = dir.join("repo/public/fonts/apple.ttf");
+        let big = dir.join("repo/public/fonts/cjk.ttf");
+        put(&fake, "(function(){})();\n");
+        put(&upper, "var a = 1;\n");
+        fs::create_dir_all(real.parent().expect("parent")).expect("mkdir");
+        fs::write(&real, b"\x00\x01\x00\x00 rest of a font").expect("write");
+        fs::write(&otf, b"OTTO rest of a font").expect("write");
+        fs::write(&mac, b"true rest of a font").expect("write");
+        // Over the limit, starts like a font: read for its head, never
+        // hashed, even when its bytes are a known file.
+        let mut body = b"\x00\x01\x00\x00".to_vec();
+        body.resize(usize::try_from(TRUETYPE_HASH_MAX).expect("fits") + 1, 0);
+        fs::write(&big, &body).expect("write");
+        let ind = Indicators {
+            strong: vec!["MARKER-ALPHA".into()],
+            hashes: vec![(crate::sha256::file(&big).expect("hash"), "big".into())],
+            ..Indicators::default()
+        };
+        let walk = Walk {
+            files: vec![fake.clone(), upper.clone(), real, otf, mac, big],
+            ..Walk::default()
+        };
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let mut v = Verdict::new();
+        fonts(&walk, &ind, &mut v, &mut Sink::Dry(&q));
+        let hits: Vec<&str> = v
+            .findings()
+            .filter(|f| f.level == crate::verdict::Level::Hit)
+            .map(|f| f.message.as_str())
+            .collect();
+        assert_eq!(hits.len(), 2, "{hits:?}");
+        assert!(hits.iter().any(|m| m
+            .starts_with("font file is not a font (first bytes: 28 66 75 6e)")
+            && m.ends_with("fa-solid-300.ttf")));
+        assert!(hits.iter().any(|m| m.ends_with("BRAND.TTF")));
         let _ = fs::remove_dir_all(&dir);
     }
 
