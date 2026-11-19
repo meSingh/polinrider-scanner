@@ -1,0 +1,41 @@
+{
+  "why": "The second npm variant of November 2026 inserts its var z tag as lines of their own, with no padding and a tag that is not a number ('-II', '-%', '-E', '-1234567890'), followed by the six-number NX table. The 3.0.1 pattern needs the padding and digits, so these files came back clean; the 2026-11-16 review found the form in eight injected files across six npm releases. Inside node_modules the release itself is the indicator; this case is a copy outside it, in a vendored folder and a build output, as both table spellings, since which one the files use is not established.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/vendor/utils/lib/index.js": "'use strict';\nObject.defineProperty(exports, '__esModule', { value: true });\nvar z = '-II';\nvar NX = [6912847, 367, 20411, 613, 43759, 5019283];\nvar SX = [1, 2, 3, 4, 5, 6];\n",
+    "code/proj/vendor/forms/lib/index.js": "module.exports = require('./core');\r\nvar z = '-%';\r\nvar NX=[6912847,367,20411,613,43759,5019283];\r\n",
+    "code/proj/dist/help.js": "export default {};\nvar z = '-E';\n\tvar NX = [6912847, 367, 20411, 613, 43759, 5019283];\n",
+    "code/proj/dist/wiki.js": "var z='-1234567890'; var NX=[6912847,367,20411,613,43759,5019283];\n",
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "vendor/utils/lib/index.js"
+      },
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "vendor/forms/lib/index.js"
+      },
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "dist/help.js"
+      },
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "dist/wiki.js"
+      }
+    ],
+    "must_not_report": [
+      "src/index.js"
+    ]
+  }
+}

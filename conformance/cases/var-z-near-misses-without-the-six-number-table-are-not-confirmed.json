@@ -1,0 +1,20 @@
+{
+  "why": "Each half of the unpadded var z form is ordinary code on its own: a minifier names variables z, and a table of six numbers is common. The pattern is at the confirmed tier, so it must need the tag, a hyphen, the NX table straight after and exactly six numbers in it. Every file here lacks one of those, and none may be a hit.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/lib/alone.js": "var z = '-II';\nmodule.exports = z;\n",
+    "code/proj/lib/short.js": "var z = '-II';\nvar NX = [1, 2];\n",
+    "code/proj/lib/table.js": "var NX = [6912847, 367, 20411, 613, 43759, 5019283];\n",
+    "code/proj/lib/apart.js": "var z = '-II';\nvar a = 1;\nvar NX = [6912847, 367, 20411, 613, 43759, 5019283];\n",
+    "code/proj/lib/nohyphen.js": "var z = 'II';\nvar NX = [6912847, 367, 20411, 613, 43759, 5019283];\n",
+    "code/proj/lib/seven.js": "var z = '-II';\nvar NX = [6912847, 367, 20411, 613, 43759, 5019283, 9];\n"
+  },
+  "expect": {
+    "exit": 0,
+    "must_not_report": [
+      "[HIT]"
+    ]
+  }
+}

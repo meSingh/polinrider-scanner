@@ -677,6 +677,34 @@ mod tests {
         }
     }
 
+    /// The second npm variant's tag, inserted as its own lines with no
+    /// padding, before the six-number NX table. Only the two together.
+    #[test]
+    fn the_unpadded_var_z_tag_needs_the_six_number_table_after_it() {
+        let ind = Indicators::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("ioc"))
+            .expect("the shipped indicator set loads");
+        let table = "6912847, 367, 20411, 613, 43759, 5019283";
+        for confirmed in [
+            format!("var z = '-II';\nvar NX = [{table}];\n"),
+            format!("var z = '-%';\r\nvar NX=[{}];", table.replace(", ", ",")),
+            format!("module.exports = x;\nvar z = '-E';\n\tvar NX = [{table}];"),
+            format!("var z='-1234567890'; var NX=[{table}];"),
+        ] {
+            assert!(ind.has_strong(&confirmed), "{confirmed:?}");
+        }
+        for not_confirmed in [
+            "var z = '-II';\nmodule.exports = z;\n".to_string(),
+            "var z = '-II';\nvar NX = [1, 2];\n".to_string(),
+            format!("var NX = [{table}];\n"),
+            format!("var z = '-II';{}var NX = [{table}];", "\n".repeat(9)),
+            format!("var z = '-II';\nvar a = 1;\nvar NX = [{table}];"),
+            format!("var z = 'II';\nvar NX = [{table}];"),
+            format!("var z = '-II';\nvar NX = [{table}, 9];"),
+        ] {
+            assert!(!ind.has_strong(&not_confirmed), "{not_confirmed:?}");
+        }
+    }
+
     #[test]
     fn a_content_pattern_is_placed_at_its_fixed_part_for_a_cut() {
         let ind = Indicators {

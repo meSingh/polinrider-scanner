@@ -1,0 +1,24 @@
+{
+  "why": "The unpadded var z form is confirmed, but it is inserted as lines of its own, not behind the padding clean cuts at. Cutting a guess out of a package's entry file is how a cleanup breaks a project; the fix is another release. So clean leaves the file exactly as it was and says why, as for any indicator outside the campaign's shape.",
+  "command": "clean",
+  "roots": [
+    "code/proj"
+  ],
+  "files": {
+    "code/proj/tailwind.config.js": "module.exports = { content: [] };\nvar z = '-II';\nvar NX = [6912847, 367, 20411, 613, 43759, 5019283];\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "config file contains an indicator",
+        "path": "tailwind.config.js"
+      }
+    ],
+    "must_print": [
+      "the indicator is not behind the padding this campaign uses"
+    ]
+  }
+}

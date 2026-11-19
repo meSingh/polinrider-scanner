@@ -31,6 +31,23 @@ node +[^ "']*fa-solid-[0-9]{3}\.woff2
 # https://github.com/OpenSourceMalware/PolinRider
 [ 	]{64,}var z = '-[0-9]+(-[0-9]+)?';
 
+# The same tag as the second npm variant writes it: inserted as lines of their
+# own, with no padding, a tag that is not a number ('-II', '-%', '-E',
+# '-1234567890'), and the six-number NX table straight after it. Neither part
+# alone is enough: a minifier can name a variable z, and a table of six numbers
+# is ordinary, so the tag must be followed within eight blank characters by
+# exactly six whole numbers in a var NX table. [^!-~] is anything that is not a
+# visible ASCII character, so a space, a tab or the line break between the two
+# statements; the pattern language has no \n. Both var NX=[ and var NX = [ are
+# taken, because which spelling the files use is not established, and the
+# first number (6912847 in Greenflagged's listing) is not required for the same
+# reason. No padding means clean cannot cut it and says so; the file is a
+# package's own entry file, and the fix is another release.
+# Source: Greenflagged, "@adminide-stack npm compromise", 2026-11-03, updated
+# 2026-11-04 (the tag values and the NX and SX tables); the 2026-11-16
+# indicator review (eight injected files across six npm releases).
+var z ?= ?'-[^']{1,16}';[^!-~]{0,8}var NX ?= ?\[[0-9]+(, ?[0-9]+){5}\]
+
 # The global.i campaign tag, either quote style, any campaign number. The
 # pinned A8 forms in strong.txt are two of its matches; A10 and A11 are the
 # later builds. The number must be followed by - or a closing quote, so
