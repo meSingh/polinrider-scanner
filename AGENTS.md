@@ -357,6 +357,7 @@ descending. That was the six-hour scan ([ADR-0025](./docs/adr/0025-walk-the-file
 | Releases | GitHub Releases | Per tag, from `release.yml`: five binary archives, a Windows zip, two `.deb` packages and the source, all attested and in `SHA256SUMS` |
 | Homebrew tap | `meSingh/homebrew-tap` | Installs the binary and `ioc/`. `release.yml` opens the bump pull request; the maintainer merges it |
 | Scoop bucket | `meSingh/scoop-bucket` | Same, from the Windows zip |
+| GitHub action | `meSingh/polinrider-action` | Runs the released binary in CI, its version and archive hashes pinned in `action.yml` (ADR-0062). `release.yml` opens the bump pull request; the maintainer merges it and tags a release of the action. Its tests: `test/container.sh` there |
 | winget | `microsoft/winget-pkgs` | Package `meSingh.PolinRiderScanner`, not merged yet. The first submission, `meSingh.PolinRiderCleaner`, was withdrawn with the rename (ADR-0057). `release.yml` writes the manifests as the `winget-manifests` artifact; submitting them is by hand |
 | Weekly indicator review | claude.ai routine "PolinRider indicator watch (2.0)" | Mondays 08:00 IST. Opens a draft `ioc/YYYY-MM-DD` pull request every week with signed commits, change or no change |
 | Beta binaries | `.github/workflows/beta-build.yml` | Builds and exercises every platform on each push to `main`. The only place the macOS and Windows live checks run |
@@ -455,13 +456,18 @@ SHA256SUMS
 
 The packaging itself is in `packaging/`: `deb.sh` builds the `.deb`,
 `formula.sh` and `scoop.sh` rewrite the tap and bucket manifests from
-`SHA256SUMS`, `winget.sh` writes the winget manifests and `bump.sh` opens the
+`SHA256SUMS`, `action.sh` rewrites the pinned lines of the GitHub action's
+`action.yml`, `winget.sh` writes the winget manifests and `bump.sh` opens the
 pull requests. Each one writes files or calls GitHub's API; none of them runs
 the binary.
 
 **5. Then the packages.** After publishing, the `packages` job opens a pull
-request on `meSingh/homebrew-tap` and one on `meSingh/scoop-bucket` with the
-new version, URLs and checksums. **Review and merge both.** It needs the
+request on `meSingh/homebrew-tap`, one on `meSingh/scoop-bucket` and one on
+`meSingh/polinrider-action` with the new version, URLs and checksums.
+**Review and merge all three**, then tag the action's merged commit with its
+next version, signed, and publish that release so Dependabot offers it to the
+action's users. The action's pull request also carries the date of the newest
+indicator review at the tag. It needs the
 `PACKAGING_TOKEN` secret (below); without it the job prints a notice and
 does nothing, and the two manifests are bumped by hand as before. It skips
 pre-release tags (`v2.1.0-rc.1`).
@@ -529,13 +535,15 @@ value so it never reaches shell history.
 ### Maintaining PACKAGING_TOKEN
 
 The `packages` job in `release.yml` reads `secrets.PACKAGING_TOKEN` to open the
-tap and bucket pull requests. The default workflow token cannot, because it
+tap, bucket and action pull requests. The default workflow token cannot, because it
 reaches this repository only. To create it, at GitHub, Settings, Developer
 settings, Fine-grained tokens, Generate new token:
 
 1. **Resource owner:** meSingh. **Expiration:** a year at most.
 2. **Repository access:** Only select repositories, and select exactly
-   `meSingh/homebrew-tap` and `meSingh/scoop-bucket`. Not this repository.
+   `meSingh/homebrew-tap`, `meSingh/scoop-bucket` and
+   `meSingh/polinrider-action`. Not this repository. Until the token can
+   reach the action's repository, its step prints a notice and passes.
 3. **Repository permissions:** **Contents: Read and write** (the branch and
    the commit) and **Pull requests: Read and write** (the pull request).
    Metadata: Read-only is added by GitHub and is required. Nothing else.
@@ -543,7 +551,7 @@ settings, Fine-grained tokens, Generate new token:
    `gh secret set PACKAGING_TOKEN --repo meSingh/polinrider-scanner`, which
    prompts for the value.
 
-It can write to the tap and the bucket, so it lives as a repository secret
+It can write to the tap, the bucket and the action, so it lives as a repository secret
 read by one job, which runs only after a release from a protected tag has
 been published. Its pull requests still need the maintainer to merge them; the
 token is never used to push to a default branch.
@@ -551,7 +559,7 @@ token is never used to push to a default branch.
 When it expires, the `packages` job fails with an authentication error after
 the release is already published, so the release itself is unaffected; if the
 secret is deleted, the job prints a notice and passes. Either way the packages
-fall behind quietly. If a release's tap or bucket pull request did not appear,
+fall behind quietly. If a release's tap, bucket or action pull request did not appear,
 check the token first. Do not replace it with a classic token,
 which would need `repo` scope over every repository the owner can reach.
 

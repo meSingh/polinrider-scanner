@@ -397,7 +397,7 @@ jobs:
         run: gh workflow run docs.yml --repo "$REPO" --ref main
 
   packages:
-    name: Tap and bucket pull requests
+    name: Tap, bucket and action pull requests
     # After the release exists, so every URL in the pull requests resolves.
     needs: [check, release]
     runs-on: ubuntu-latest
@@ -411,8 +411,9 @@ jobs:
           ref: ${{ github.event.inputs.tag || github.ref }}
           persist-credentials: false
 
-      # PACKAGING_TOKEN is a fine-grained token that can write to the tap and
-      # the bucket and nothing else (AGENTS.md, "Maintaining PACKAGING_TOKEN").
+      # PACKAGING_TOKEN is a fine-grained token that can write to the tap, the
+      # bucket and the action and nothing else (AGENTS.md, "Maintaining
+      # PACKAGING_TOKEN").
       # Without it this job says so and stops; the release is already out and
       # the packages can be bumped by hand.
       - name: Is there a token, and is this a final release
@@ -422,10 +423,10 @@ jobs:
           TAG: ${{ needs.check.outputs.tag }}
         run: |
           if [[ -z "$PACKAGING_TOKEN" ]]; then
-            echo "::notice title=Packages not bumped::PACKAGING_TOKEN is not set, so the Homebrew tap and the Scoop bucket were not touched. Bump them by hand."
+            echo "::notice title=Packages not bumped::PACKAGING_TOKEN is not set, so the Homebrew tap, the Scoop bucket and the GitHub action were not touched. Bump them by hand."
             echo "go=false" >> "$GITHUB_OUTPUT"
           elif [[ "$TAG" == *-* ]]; then
-            echo "::notice title=Packages not bumped::${TAG} is a pre-release. The tap and the bucket follow final releases only."
+            echo "::notice title=Packages not bumped::${TAG} is a pre-release. The tap, the bucket and the action follow final releases only."
             echo "go=false" >> "$GITHUB_OUTPUT"
           else
             echo "go=true" >> "$GITHUB_OUTPUT"
@@ -457,3 +458,21 @@ jobs:
         run: |
           packaging/bump.sh meSingh/scoop-bucket bucket/polinrider-scanner.json \
             "${TAG#v}" release/SHA256SUMS packaging/scoop.sh
+
+      # The action pins this release's version and the SHA-256 of each
+      # archive in its action.yml (ADR-0062). Its pull request is reviewed and
+      # merged like the others, and the maintainer then tags a release of the
+      # action. Until the token can reach the action's repository, this says
+      # so and passes: the release is already out.
+      - name: GitHub action
+        if: steps.gate.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.PACKAGING_TOKEN }}
+          TAG: ${{ needs.check.outputs.tag }}
+        run: |
+          if ! gh api repos/meSingh/polinrider-action --jq .full_name >/dev/null 2>&1; then
+            echo "::notice title=Action not bumped::PACKAGING_TOKEN cannot reach meSingh/polinrider-action, so the action was not touched. Bump it by hand with packaging/action.sh."
+            exit 0
+          fi
+          packaging/bump.sh meSingh/polinrider-action action.yml \
+            "${TAG#v}" release/SHA256SUMS packaging/action.sh

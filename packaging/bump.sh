@@ -3,11 +3,11 @@
 #
 #   GH_TOKEN=... packaging/bump.sh REPO FILE VERSION SHA256SUMS RENDERER
 #
-#   REPO        meSingh/homebrew-tap or meSingh/scoop-bucket
+#   REPO        meSingh/homebrew-tap, meSingh/scoop-bucket or meSingh/polinrider-action
 #   FILE        the manifest's path in REPO
 #   VERSION     the version without the v
 #   SHA256SUMS  the release's checksum file
-#   RENDERER    packaging/formula.sh or packaging/scoop.sh
+#   RENDERER    packaging/formula.sh, packaging/scoop.sh or packaging/action.sh
 #
 # Run by release.yml with PACKAGING_TOKEN. It never pushes to the default
 # branch. It creates a branch, makes one commit on it and opens a pull request,
@@ -86,6 +86,7 @@ echo "commit ${oid}: verification ${verified}"
 release="https://github.com/meSingh/polinrider-scanner/releases/tag/v${version}"
 case "$(basename "$renderer")" in
   scoop.sh) asset="polinrider-v${version}-windows-x86_64.zip" ;;
+  action.sh) asset="polinrider-v${version}-linux-x86_64.tar.gz" ;;
   *) asset="polinrider-v${version}-macos-arm64.tar.gz" ;;
 esac
 jq -n --arg title "$headline" --arg head "$branch" --arg base "$base" --arg body "$(cat <<EOF

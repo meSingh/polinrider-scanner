@@ -75,6 +75,7 @@ If you disagree with one, open an issue and quote its number.
 | [0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) | Confirm the var z and global.i tags, and read every JavaScript file | Accepted |
 | [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
 | [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
+| [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
 
 ## Adding one
 

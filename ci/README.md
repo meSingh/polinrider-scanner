@@ -11,6 +11,23 @@ repositories, using a copy of the scanner that lives inside them.
 **Why a copy.** So the scan does not depend on anything that can change under
 you. See [below](#why-the-scanner-is-vendored-not-installed).
 
+**Or the action.** [`meSingh/polinrider-action`](https://github.com/meSingh/polinrider-action)
+runs the released binary instead, pinned by hash
+([ADR-0062](../docs/adr/0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md)).
+The two trust different things:
+
+| | The action | This copy |
+|---|---|---|
+| What runs | The released `polinrider` binary, the laptop engine | A shell port of the checks, in your repository |
+| What you trust | The action at the commit you pin, this repository's release on GitHub and the SHA-256 of each archive written into the action | Only the files you copied in and reviewed |
+| Fetched at scan time | One release archive, refused unless its hash matches | Nothing |
+| Staying current | Dependabot moves the pin after each release | Re-run `install-workflow.sh` in each repository |
+| Removing the payload | `mode: fix` opens a pull request; it never commits to the scanned branch | By hand |
+
+Use the copy when you will not trust anything fetched at scan time. Use the
+action when you want the laptop engine's verdict and indicators that stay
+current without re-installing.
+
 | File | What it is |
 |---|---|
 | `scan-workspace.sh` | The scanner. Scans a working tree, and with `--all-refs` every ref in the repository |
@@ -31,6 +48,12 @@ right now, your detection tooling becomes the delivery mechanism.
 So `install-workflow.sh` copies the scanner into `.github/polinrider/` in your
 repository. After that the scan runs entirely from code you control, reviewed in
 your own pull requests, with no network fetch at scan time.
+
+The action ([above](#continuous-scanning)) narrows the same risk rather than
+removing it: it fetches one archive from this repository's releases, refuses
+it unless its SHA-256 matches the one written into the action, and you pin the
+action itself by commit SHA. That is a smaller thing to trust than a moving
+tag, and still more than this copy asks.
 
 The only action used is `actions/checkout`, published by GitHub, pinned to a
 commit SHA rather than a moving tag.
