@@ -10,7 +10,16 @@ Everything you need, in one page. Three commands do almost all of it.
 
 ## First time only
 
-You need **Docker Desktop** running. That is the only setup step.
+Clone with the submodule, so `action/` (the GitHub action) is filled in:
+
+```bash
+git clone --recurse-submodules https://github.com/meSingh/polinrider-scanner.git
+```
+
+Already cloned without it? `git submodule update --init` fills it in. Nothing
+in the sandbox needs `action/`; only changing the action does.
+
+You need **Docker Desktop** running. That is the only other setup step.
 
 ```bash
 brew install --cask docker    # if you do not have it
@@ -106,6 +115,41 @@ edit-and-see-it loop.
 | `conformance/` | The specification: what a scan must return, as data |
 | `docs-site/` | The documentation site |
 | `docs/adr/` | Why things are the way they are, each with its cost |
+| `action/` | The GitHub action, a submodule: its own repository, `meSingh/polinrider-action` |
+
+## Changing the GitHub action
+
+`action/` is a submodule: a pointer to one commit of
+`meSingh/polinrider-action`, which has its own history, releases and
+Marketplace listing ([ADR-0062](./docs/adr/0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md)).
+A change to the action is two commits, in this order:
+
+1. **In the action.** Make the change inside `action/` (or a separate clone),
+   run its tests, commit signed and push to the action's repository, through
+   a pull request there:
+
+   ```bash
+   cd action
+   git checkout -b my-change origin/main
+   # edit, then run the fixtures in a disposable container:
+   gh release download v3.1.0 --repo meSingh/polinrider-scanner \
+     --pattern 'polinrider-v3.1.0-linux-*.tar.gz' --dir dist/v3.1.0
+   test/container.sh dist
+   ```
+
+2. **Here.** Once it is merged there, move the pointer and commit that in a
+   pull request here, whose `Test the action` job runs it on a real runner:
+
+   ```bash
+   git -C action fetch && git -C action checkout origin/main
+   git add action && git commit -S -m "Move the action to <short sha>"
+   ```
+
+You rarely do step 2 by hand: Dependabot opens that pull request each week the
+action has moved. A new polinrider release moves the action itself: the
+Release workflow opens a pull request on the action's repository with the new
+version and hashes, and the maintainer tags the action's next version (v1.1.0
+for polinrider 3.2.0) once it is merged.
 
 ## A limit worth knowing
 

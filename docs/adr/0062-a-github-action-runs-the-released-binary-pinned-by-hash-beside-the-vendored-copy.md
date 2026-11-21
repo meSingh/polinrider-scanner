@@ -32,6 +32,12 @@ Offer both, and say what each one trusts.
 - **The action lives in its own repository, `meSingh/polinrider-action`.** The
   Marketplace lists one action per repository, from an `action.yml` at its
   root, and users then fetch a few small files instead of this repository.
+- **It is also a submodule here, at `action/`.** The submodule points at one
+  commit of the action's repository. It links the two from this repository,
+  and it lets a `Test the action` job in `ci.yml` run `uses: ./action` on a
+  real runner, against a clean fixture and an infected one built from `ioc/`,
+  on every pull request here. Dependabot's `gitsubmodule` updater moves the
+  pointer each week the action has moved.
 - **It runs the released binary and nothing else.** A composite action in
   bash, with no npm and no other action inside it. It downloads the
   `polinrider` archive for the runner from this repository's release. The
@@ -61,6 +67,9 @@ Offer both, and say what each one trusts.
   from the release's `SHA256SUMS`, and `bump.sh` commits through GitHub's API.
   The maintainer merges it and tags a release of the action. Pre-release tags
   are skipped.
+- **The action has its own versions**, from v1.0.0. Each new polinrider
+  release becomes a new minor version (v1.1.0 for polinrider 3.2.0), and
+  each release's notes name the polinrider version it pins.
 - **Users pin the action by commit SHA**, with Dependabot moving the pin, and
   make the check required on their default branch. Tags of the action never
   move, as with the scanner's.
@@ -107,6 +116,15 @@ What it costs:
 - **A second release to cut.** Each scanner release now ends with a merge and
   a tag in the action's repository, and the first one with ticking "Publish
   this Action to the GitHub Marketplace", which only the maintainer can do.
+- **A change to the action is two commits.** One in the action's repository,
+  through its own pull request, then one here that moves `action/`. A plain
+  `git clone` of this repository leaves `action/` empty (`HACKING.md` says to
+  clone with `--recurse-submodules`), and the release's source archive does
+  not include it, since `git archive` skips submodules; the action has its own
+  releases.
+- **The pointer here can lag the action.** Between a release of the action and
+  Dependabot's next run, `action/` points at an older commit. Nothing here
+  ships from it; it is the link and the CI test.
 
 ## Related
 

@@ -269,6 +269,13 @@ is shell, scans every ref of the history, and reads escape codes and package
 names the way the binary does. If you vendored it from 2.1.0 or earlier, re-run
 the installer with `--force`. See [`ci/README.md`](ci/README.md).
 
+Or use the GitHub action,
+[`meSingh/polinrider-action`](https://github.com/meSingh/polinrider-action)
+(also [`action/`](action/) here). It runs the released binary instead of the
+shell port, pinned by hash, and its fix mode opens a pull request rather than
+touching your branch. [`ci/README.md`](ci/README.md) compares the two and what
+each one trusts.
+
 <details>
 <summary><strong>Organization and machine hardening</strong></summary>
 

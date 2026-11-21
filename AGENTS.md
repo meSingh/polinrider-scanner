@@ -144,8 +144,9 @@ the sandbox and the test harness.
 | `docs/adr/` | one record per design decision, with its reasoning and its cost |
 | `docs-site/` | the documentation site, plain Astro (ADR-0055), including the weekly indicator reviews |
 | `ci/` | the vendorable CI scanner, its workflow template and installer, and the sandbox demo |
+| `action/` | a submodule: `meSingh/polinrider-action`, the GitHub action, at one commit (ADR-0062). Change it there first, then move the pointer here; `HACKING.md`, "Changing the GitHub action" |
 | `.github/scripts/` | scripts the workflows run that are not part of the tool: `downloads.py`, the release download history |
-| `packaging/` | the `.deb` builder, the tap, bucket and winget manifest writers and the bump pull request script, all used by `release.yml` |
+| `packaging/` | the `.deb` builder, the tap, bucket, action and winget manifest writers and the bump pull request script, all used by `release.yml` |
 | `polinrider-sandbox`, `.devcontainer/` | the container every test runs in |
 
 ### What each module holds
