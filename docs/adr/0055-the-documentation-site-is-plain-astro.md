@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; its analytics choice (Cloudflare Web Analytics) is superseded by [ADR-0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) |
 | **Date** | 2026-11-04 |
 | **Supersedes** | [ADR-0028](./0028-the-documentation-site-is-astro-starlight.md), for the Starlight part. Astro and the Node toolchain stay |
 

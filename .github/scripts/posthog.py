@@ -194,7 +194,7 @@ def action_users(data_dir):
 def release_downloads(data_dir):
     """Release downloads per day, from the same arithmetic as the weekly
     tables (downloads.py): `downloads` as GitHub counted them, `ours` from
-    ours.csv, and `people`, the difference, which can be below zero on a day
+    ours.csv and `people`, the difference, which can be below zero on a day
     when one of ours is recorded on a different day from the one GitHub
     counted it.
 
