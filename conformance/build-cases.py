@@ -1098,8 +1098,12 @@ case(
         "and re-clone', which throws away whatever was not pushed. Work in "
         "the infected file itself survives byte for byte, other files are "
         "not opened for writing, and nothing under .git changes: no pull, no "
-        "reset, no stash, no staging. A cleanup tool that runs git inside a "
-        "repository an attacker wrote to is taking orders from its config.",
+        "reset, no stash, no staging. Since 3.3.0 clean reads each "
+        "repository's history, through plumbing that writes nothing and "
+        "with the one setting of a repository's config that could start a "
+        "program switched off: a cleanup tool that let git run a program "
+        "named by a config an attacker wrote would be taking orders from "
+        "it (ADR-0068). This .git is not one git can open, which it says.",
     command="clean",
     apply=True,
     roots=["code"],

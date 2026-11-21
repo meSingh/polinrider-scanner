@@ -996,10 +996,10 @@ impl GitHooks {
         match self.stock {
             0 => {}
             1 => v.push(Finding::ok(
-                "1 git hook is the stock hook git-lfs, husky or yorkie writes, byte for byte",
+                "1 git hook is the stock hook git-lfs, husky or yorkie writes",
             )),
             n => v.push(Finding::ok(format!(
-                "{n} git hooks are the stock hooks git-lfs, husky or yorkie write, byte for byte"
+                "{n} git hooks are the stock hooks git-lfs, husky or yorkie write"
             ))),
         }
     }

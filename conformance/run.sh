@@ -174,6 +174,12 @@ impl_rust() {
     cat "$log"
     return "$krc"
   fi
+  if [[ "$NO_GIT" == "true" ]]; then
+    # No git on the way: the binary is named by its path, so only git is
+    # missing (ADR-0068).
+    PATH=/nonexistent "$bin" "${args[@]}" "$@" 2>&1
+    return
+  fi
   "$bin" "${args[@]}" "$@" 2>&1
 }
 
@@ -221,6 +227,60 @@ build_files_exact() {
     mkdir -p "$dest/$(dirname "$path")"
     subst "$content" > "$dest/$path"
   done < <(jq -r --arg k "$key" '.[$k] // {} | keys[]' "$cf")
+}
+
+# build_git <case file> <tree>: real git repositories in the tree, from the
+# case's "git" list (ADR-0068). For each: commits in order, each on its branch
+# (a new branch starts from main), then tags, then back on main, then files
+# stashed, then files staged, then a bare copy and a plain clone, then a
+# blob nothing reaches. Files the case writes later are uncommitted changes.
+build_git() {
+  local cf="$1" tree="$2" n i k dir path branch blob
+  local g=(git -c user.name=fixture -c user.email=fixture@localhost -c commit.gpgsign=false -c init.defaultBranch=main)
+  n="$(jq -r '.git // [] | length' "$cf")"
+  for ((i = 0; i < n; i++)); do
+    dir="$tree/$(jq -r --argjson i "$i" '.git[$i].dir' "$cf")"
+    mkdir -p "$dir"; "${g[@]}" -C "$dir" init -q
+    writes() { # writes <jq path to a file map>
+      while IFS= read -r path; do
+        mkdir -p "$dir/$(dirname "$path")"
+        subst "$(jq -r --argjson i "$i" --arg p "$path" "$1[\$p]" "$cf")" > "$dir/$path"
+      done < <(jq -r --argjson i "$i" "$1 // {} | keys[]" "$cf")
+    }
+    local c commits; commits="$(jq -r --argjson i "$i" '.git[$i].commits // [] | length' "$cf")"
+    for ((c = 0; c < commits; c++)); do
+      branch="$(jq -r --argjson i "$i" --argjson c "$c" '.git[$i].commits[$c].branch // "main"' "$cf")"
+      if [[ "$("${g[@]}" -C "$dir" rev-parse -q --verify HEAD 2>/dev/null)" != "" ]]; then
+        if "${g[@]}" -C "$dir" rev-parse -q --verify "refs/heads/$branch" >/dev/null; then
+          "${g[@]}" -C "$dir" checkout -q "$branch"
+        else
+          "${g[@]}" -C "$dir" checkout -q -b "$branch" main
+        fi
+      fi
+      writes ".git[\$i].commits[$c].files"
+      while IFS= read -r path; do rm -f "$dir/$path"; done < <(jq -r --argjson i "$i" --argjson c "$c" '.git[$i].commits[$c].remove // [] | .[]' "$cf")
+      "${g[@]}" -C "$dir" add -A
+      "${g[@]}" -C "$dir" commit -q --allow-empty -m "commit $c"
+    done
+    while IFS=$'\t' read -r k branch; do
+      [[ -n "$k" ]] && "${g[@]}" -C "$dir" tag "$k" "$branch"
+    done < <(jq -r --argjson i "$i" '.git[$i].tags // {} | to_entries[] | "\(.key)\t\(.value)"' "$cf")
+    "${g[@]}" -C "$dir" rev-parse -q --verify refs/heads/main >/dev/null && "${g[@]}" -C "$dir" checkout -q main
+    if [[ "$(jq -r --argjson i "$i" '.git[$i] | has("stash")' "$cf")" == "true" ]]; then
+      writes ".git[\$i].stash"
+      "${g[@]}" -C "$dir" stash push -q -u
+    fi
+    if [[ "$(jq -r --argjson i "$i" '.git[$i] | has("stage")' "$cf")" == "true" ]]; then
+      writes ".git[\$i].stage"
+      "${g[@]}" -C "$dir" add -A
+    fi
+    k="$(jq -r --argjson i "$i" '.git[$i].bare // empty' "$cf")"
+    [[ -n "$k" ]] && "${g[@]}" clone -q --bare "$dir" "$tree/$k"
+    k="$(jq -r --argjson i "$i" '.git[$i].clone // empty' "$cf")"
+    [[ -n "$k" ]] && "${g[@]}" clone -q --no-checkout "$dir" "$tree/$k" && "${g[@]}" -C "$tree/$k" checkout -q main
+    blob="$(jq -r --argjson i "$i" '.git[$i].loose // empty' "$cf")"
+    [[ -n "$blob" ]] && subst "$blob" | "${g[@]}" -C "$dir" hash-object -w --stdin >/dev/null
+  done
 }
 
 # build_forge <case file> <destination>: real git repositories for every
@@ -337,11 +397,15 @@ run_case() {
   KILL_IN="$(jq -r '.kill.in // "report"' "$cf")"
   EXTRA_ARGS=()
   HOME_FLAG="$(jq -r 'if has("home_flag") then .home_flag else true end' "$cf")"
+  NO_GIT="$(jq -r '.no_git // false' "$cf")"
   # Flags of the case's own for its first run, as then.args are for a second.
   while IFS= read -r ed; do EXTRA_ARGS+=("$ed"); done < <(jq -r '.args[]? // empty' "$cf")
 
   # build the fixture: the tree to scan, the home directory, and for a host
   # case the machine's state
+  # Repositories first: files the case writes after them are changes not yet
+  # committed, and hooks go into a .git that exists.
+  build_git "$cf" "$tmp/tree"
   build_files "$cf" files "$tmp/tree"
   build_files_exact "$cf" files_exact "$tmp/tree"
   build_files "$cf" home "$FAKE_HOME"
@@ -736,6 +800,7 @@ refusals() {
   check_refusal "the guided flow told to --resume"   guide --resume
   check_refusal "--resume alongside --fresh"         check --resume --fresh "$tmp"
   check_refusal "--resume alongside --apply"         check --apply --resume "$tmp"
+  check_refusal "clean told to --git-all"            clean --git-all "$tmp"
   check_refusal "a root that does not exist" check "$tmp/definitely-absent"
   check_refusal "no root at all"             check --fs-only
   check_refusal "a missing indicator set"    check --ioc "$tmp/no-ioc-here" "$tmp"

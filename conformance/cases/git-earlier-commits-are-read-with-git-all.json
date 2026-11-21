@@ -1,0 +1,46 @@
+{
+  "why": "With --git-all every commit any branch or reflog reaches is read, and then every object nothing reaches. The same repository that is clean by default is confirmed: the earlier commit is named, and so is the stray object, which has no path and is read as JavaScript. The ok line is not printed, since something was found (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        },
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n"
+          }
+        }
+      ],
+      "loose": "export const x = 1\n{{PAD}}{{STRONG}}\n"
+    }
+  ],
+  "args": [
+    "--git-all"
+  ],
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop"
+      }
+    ],
+    "must_print": [
+      "earlier commit ",
+      "postcss.config.mjs",
+      "an object no branch or commit reaches ("
+    ],
+    "must_not_print": [
+      "none holds the payload"
+    ]
+  }
+}

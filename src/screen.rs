@@ -135,16 +135,15 @@ impl Screen {
                         _ => format!("    {} files read so far", thousands(n)),
                     });
                 }
-                if self.beating && elapsed >= self.next_beat {
-                    if let Some(count) = &self.count {
-                        frame.lines.push(format!(
-                            "    still running after {}: {}",
-                            duration(elapsed),
-                            count.trim_start()
-                        ));
-                        self.next_beat = elapsed + BEAT;
-                    }
-                }
+                self.beat(elapsed, &mut frame);
+            }
+            Event::Repos { n, of, elapsed } => {
+                self.count = Some(format!(
+                    "    {} of {} git repositories read",
+                    thousands(n),
+                    thousands(of)
+                ));
+                self.beat(elapsed, &mut frame);
             }
             Event::Done(n, took) => {
                 if self.live {
@@ -163,6 +162,21 @@ impl Screen {
             Event::Save { .. } => {}
         }
         self.frame(frame)
+    }
+
+    /// Into a pipe, once a minute: the step is still running, and how far
+    /// it has come. ADR-0070.
+    fn beat(&mut self, elapsed: Duration, frame: &mut Frame) {
+        if self.beating && elapsed >= self.next_beat {
+            if let Some(count) = &self.count {
+                frame.lines.push(format!(
+                    "    still running after {}: {}",
+                    duration(elapsed),
+                    count.trim_start()
+                ));
+                self.next_beat = elapsed + BEAT;
+            }
+        }
     }
 
     fn frame(&self, mut frame: Frame) -> Frame {
@@ -245,6 +259,7 @@ fn plain(kind: Kind, message: &str) -> String {
         Kind::Implant => "the second-stage implant is on this disk",
         Kind::Propagation => "the script the payload spreads with is here",
         Kind::NamedFile => "a file carries a name the campaign uses",
+        Kind::GitHistory => "a git repository still holds the payload",
         Kind::Extension => "an editor extension carries the payload",
         Kind::LoginItem => "something that starts at login runs the payload",
         Kind::Crontab => "a scheduled job runs the payload",
@@ -390,6 +405,16 @@ mod tests {
                 "    still running after 1m 1s: 62,464 files read so far",
                 "    still running after 2m 5s: 118,784 files read so far",
             ]
+        );
+        // The git part of step 2 counts repositories.
+        assert_eq!(
+            s.event(&Event::Repos {
+                n: 12,
+                of: 410,
+                elapsed: Duration::from_secs(242),
+            })
+            .lines,
+            vec!["    still running after 4m 2s: 12 of 410 git repositories read"]
         );
         // Each step starts its own minute, in its own words.
         let _ = s.event(&Event::Done(2, Duration::from_secs(130)));

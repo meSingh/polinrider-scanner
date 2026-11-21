@@ -28,5 +28,18 @@
         "path": ".git/hooks/pre-push"
       }
     ]
-  }
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
 }

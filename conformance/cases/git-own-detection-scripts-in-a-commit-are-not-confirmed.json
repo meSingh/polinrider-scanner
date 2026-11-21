@@ -1,0 +1,48 @@
+{
+  "why": "The field drive's owner kept detection scripts and notes that carry the campaign's strings, and the disk check leaves them alone: it reads the strings in JavaScript, TypeScript and build configs, and sets detection tooling and documentation aside. Git is judged by the same rules, file kind by file kind, so the same files committed are not malware either. A real payload in the same commit is still confirmed, so the rule is shown to be the file kind and not a blind spot (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/tools",
+      "commits": [
+        {
+          "files": {
+            "scripts/polinrider-scan.sh": "grep -r '{{STRONG}}' .\n",
+            "find-payload.py": "SIGNS = ['{{STRONG}}']\n",
+            "docs/incident.md": "We found {{STRONG}} appended to configs.\n",
+            "docs/sample.js": "// what it looked like\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ]
+    },
+    {
+      "dir": "code/app",
+      "commits": [
+        {
+          "files": {
+            "vite.config.js": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ]
+    }
+  ],
+  "files": {
+    "code/app/vite.config.js": "export default { plugins: {} }\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "app"
+      }
+    ],
+    "must_not_report": [
+      "/tools"
+    ]
+  }
+}

@@ -1315,7 +1315,9 @@ mod tests {
         v.entries()
             .iter()
             .map(|e| match e {
-                Entry::Section(s) | Entry::Detail(s) | Entry::Note(s) => s.clone(),
+                Entry::Section(s) | Entry::Detail(s) | Entry::Note(s) | Entry::Brief(s) => {
+                    s.clone()
+                }
                 Entry::Finding(f) => {
                     format!("{} {}", f.message, f.remedy.clone().unwrap_or_default())
                 }

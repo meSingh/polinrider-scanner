@@ -24,5 +24,18 @@
     "must_not_print": [
       "stock hook"
     ]
-  }
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
 }

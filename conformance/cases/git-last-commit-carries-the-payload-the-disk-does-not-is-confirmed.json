@@ -1,0 +1,40 @@
+{
+  "why": "The 2026-11-16 field report found three working clones whose last commit held the payload while the file on disk had been cleaned and not committed: one git restore, checkout or reset puts it back. The disk check calls such a folder clean. Git is read too now, and a payload in the last commit is confirmed, exit 2, with the place named and the advice to commit the cleaned file first (ADR-0068). The disk copy is clean, so this is the only finding.",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n",
+            "src/index.js": "export const a = 1\n"
+          }
+        }
+      ]
+    }
+  ],
+  "files": {
+    "code/shop/postcss.config.mjs": "export default { plugins: {} }\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop"
+      }
+    ],
+    "must_print": [
+      "last commit (main): postcss.config.mjs",
+      "a git restore, reset, checkout or stash pop puts the payload back"
+    ],
+    "must_not_report": [
+      "config file contains an indicator"
+    ]
+  }
+}

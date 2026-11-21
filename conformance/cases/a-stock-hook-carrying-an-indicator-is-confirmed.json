@@ -21,5 +21,18 @@
         "path": ".git/hooks/pre-commit"
       }
     ]
-  }
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
 }

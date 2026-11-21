@@ -1,0 +1,42 @@
+{
+  "why": "A bare repository has no files on disk to scan, yet every clone of it, and every push from it, spreads what it holds. The field drive kept 41 of them from an earlier history rewrite, all carrying the payload. The walk now knows one by its HEAD, objects and refs whatever it is called, reads it through git instead of listing its compressed objects, and confirms it with the advice to delete it or keep it offline (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/work",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ],
+      "bare": "code/backups/shop-before-rewrite.git"
+    }
+  ],
+  "files": {
+    "code/work/postcss.config.mjs": "export default { plugins: {} }\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop-before-rewrite.git"
+      },
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "work"
+      }
+    ],
+    "must_print": [
+      "bare repository: refs/heads/main: postcss.config.mjs",
+      "a bare repository: a clone of it, or a push from it, spreads the payload."
+    ]
+  }
+}

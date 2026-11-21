@@ -46,7 +46,7 @@ If you disagree with one, open an issue and quote its number.
 | [0028](./0028-the-documentation-site-is-astro-starlight.md) | The documentation site is Astro Starlight, on a Node toolchain | Superseded by 0055 |
 | [0029](./0029-host-state-is-read-through-one-boundary-and-can-be-supplied.md) | Host state is read through one boundary, and can be supplied | Accepted |
 | [0030](./0030-2-0-does-not-checkpoint-a-scan.md) | 2.0 does not checkpoint a scan | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) and [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
-| [0031](./0031-clean-strips-an-appended-payload-in-place-and-never-touches-git.md) | clean strips an appended payload in place, and never touches git | Accepted |
+| [0031](./0031-clean-strips-an-appended-payload-in-place-and-never-touches-git.md) | clean strips an appended payload in place, and never touches git | Accepted; amended by [ADR-0068](./0068-local-git-history-is-read-with-the-disk-s-rules.md) |
 | [0032](./0032-the-guided-flow-changes-something-only-on-a-typed-yes.md) | The guided flow changes something only on a typed yes | Accepted |
 | [0033](./0033-every-run-opens-with-the-banner-and-colour-changes-no-character.md) | Every run opens with the banner, and colour changes no character | Accepted |
 | [0034](./0034-the-verdict-is-followed-by-what-to-do-and-rebuild-is-said-only-on-proof.md) | The verdict is followed by what to do, and "rebuild" is said only on proof | Accepted |
@@ -81,6 +81,7 @@ If you disagree with one, open an issue and quote its number.
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 | [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted; amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
 | [0067](./0067-the-posthog-project-is-on-its-us-cloud.md) | The PostHog project is on PostHog's US cloud | Accepted |
+| [0068](./0068-local-git-history-is-read-with-the-disk-s-rules.md) | Read each local repository's history with the disk check's rules | Accepted |
 | [0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) | Under --fs-only, read a home only when it is named | Accepted |
 | [0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) | Tell a pipe once a minute that a step is still running | Accepted |
 | [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |

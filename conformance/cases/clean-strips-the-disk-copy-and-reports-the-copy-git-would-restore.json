@@ -1,0 +1,36 @@
+{
+  "why": "clean cuts the payload out of the file on disk, and the commit that carried it is still there: one git restore undoes the cut. clean now reads each repository's history and says so, so the run still exits 2. It reads git and never changes it: the cut file is the only change, and nothing under .git is touched (ADR-0031, ADR-0068).",
+  "command": "clean",
+  "apply": true,
+  "roots": [
+    "code/shop"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 2,
+    "tree_may_change": true,
+    "stripped": [
+      "code/shop/postcss.config.mjs"
+    ],
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history"
+      }
+    ],
+    "must_print": [
+      "last commit (main): postcss.config.mjs"
+    ]
+  }
+}

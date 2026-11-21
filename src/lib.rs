@@ -9,6 +9,7 @@ pub mod apps;
 pub mod awake;
 pub mod checks;
 pub mod cli;
+pub mod git_local;
 pub mod guide;
 mod guide_fix;
 mod guide_github;

@@ -1,0 +1,29 @@
+{
+  "why": "Git is read for confirmed indicators only. A weak signal, a folder-open task without an indicator or a payload-shaped tail in an old branch would multiply the review noise the field report found benign, 193 items of it, while the working copy is still reviewed on disk. Here a branch carries a weak string; the run is clean (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "README.txt": "shop\n"
+          }
+        },
+        {
+          "branch": "old",
+          "files": {
+            "src/rpc.js": "export const rpc = '{{WEAK}}'\n"
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "tree_may_change": false,
+    "findings": []
+  }
+}

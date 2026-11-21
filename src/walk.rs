@@ -38,9 +38,13 @@ pub const PRUNED: &[&str] = &[
 pub struct Walk {
     /// Every regular file found, excluding anything under a pruned directory.
     pub files: Vec<PathBuf>,
-    /// `.git` directories, listed but never entered, so hooks can still be
-    /// read without walking an object store.
+    /// `.git` directories, and bare repositories under any name, listed but
+    /// never entered, so hooks can still be read and history read through
+    /// git without walking an object store. ADR-0068.
     pub git_dirs: Vec<PathBuf>,
+    /// `.git` files, which point at a repository kept elsewhere: a worktree's
+    /// or a submodule's. Also in `files`. ADR-0068.
+    pub git_files: Vec<PathBuf>,
     /// Python virtual environments (`.venv`, `venv`), listed but never
     /// entered, so the startup files in their site-packages can still be
     /// read without walking every installed package.
@@ -178,6 +182,7 @@ pub fn walk_seeing(roots: &[PathBuf], options: &Options, see: &mut dyn FnMut(See
     }
     out.files.sort();
     out.git_dirs.sort();
+    out.git_files.sort();
     out.python_envs.sort();
     out.node_modules.sort();
     out
@@ -193,13 +198,27 @@ fn descend(dir: &Path, out: &mut Walk, options: &Options, see: &mut dyn FnMut(Se
             return;
         }
     };
+    let entries: Vec<(fs::DirEntry, fs::FileType)> = entries
+        .flatten()
+        .filter_map(|e| e.file_type().ok().map(|t| (e, t)))
+        .collect();
 
-    for entry in entries.flatten() {
+    // A bare repository, whatever it is called: a HEAD file beside objects
+    // and refs folders. Its objects are compressed and mean nothing read as
+    // files, so it is listed for git to read and not entered. ADR-0068.
+    let has = |name: &str, dir: bool| {
+        entries
+            .iter()
+            .any(|(e, t)| e.file_name() == name && if dir { t.is_dir() } else { t.is_file() })
+    };
+    if has("HEAD", false) && has("objects", true) && has("refs", true) {
+        see(Seen::GitDir(dir));
+        out.git_dirs.push(dir.to_path_buf());
+        return;
+    }
+
+    for (entry, meta) in entries {
         let path = entry.path();
-        let meta = match entry.file_type() {
-            Ok(t) => t,
-            Err(_) => continue,
-        };
 
         if meta.is_symlink() {
             continue;
@@ -224,6 +243,9 @@ fn descend(dir: &Path, out: &mut Walk, options: &Options, see: &mut dyn FnMut(Se
                 continue;
             }
             see(Seen::File(&path));
+            if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                out.git_files.push(path.clone());
+            }
             out.files.push(path);
             if out.files.len().is_multiple_of(TICK) {
                 see(Seen::Listed(out.files.len()));

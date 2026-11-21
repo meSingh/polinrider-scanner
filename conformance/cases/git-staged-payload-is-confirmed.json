@@ -1,0 +1,41 @@
+{
+  "why": "A payload staged in the index is recorded by the next commit, and a git checkout of that file writes it back to disk after the working copy is cleaned. The staged copy differs from the last commit, which is clean, and from the disk, which is clean too; it is confirmed and named as staged (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "src/routes/jobs.js": "export const jobs = []\n"
+          }
+        }
+      ],
+      "stage": {
+        "src/routes/jobs.js": "export const jobs = []\n{{PAD}}{{STRONG}}\n"
+      }
+    }
+  ],
+  "files": {
+    "code/shop/src/routes/jobs.js": "export const jobs = []\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop"
+      }
+    ],
+    "must_print": [
+      "staged: src/routes/jobs.js"
+    ],
+    "must_not_print": [
+      "last commit (main):"
+    ]
+  }
+}

@@ -162,6 +162,7 @@ fn main() -> ProcExit {
         // Under --fs-only, $HOME is this machine's and is not read; a home
         // named with --home is part of the disk being checked. ADR-0069.
         home_read: !args.fs_only || args.home_named,
+        git_all: args.git_all,
         host,
         on_infected_config: if clean {
             OnInfectedConfig::Strip
@@ -253,7 +254,11 @@ fn check_options(args: &cli::Args) -> Vec<String> {
         (Some(dir), false) => format!("host-state {}", dir.display()),
         (None, false) => "this machine".to_string(),
     };
-    vec![host, format!("home {}", args.home.display())]
+    let mut options = vec![host, format!("home {}", args.home.display())];
+    if args.git_all {
+        options.push("git-all".into());
+    }
+    options
 }
 
 /// Whether to continue an earlier check: with --resume, yes; with --fresh,

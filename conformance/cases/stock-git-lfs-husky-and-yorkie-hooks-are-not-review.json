@@ -20,10 +20,23 @@
     "exit": 0,
     "findings": [],
     "must_print": [
-      "3 git hooks are the stock hooks git-lfs, husky or yorkie write, byte for byte"
+      "3 git hooks are the stock hooks git-lfs, husky or yorkie write"
     ],
     "must_not_print": [
       "active git hook"
     ]
-  }
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
 }

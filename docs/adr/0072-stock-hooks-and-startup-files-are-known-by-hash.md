@@ -33,7 +33,8 @@ A review line nobody can act on teaches people to skip review lines.
   one is confirmed whatever the list says. A stock match only keeps a file
   out of review.
 - **A stock hook is counted, not reviewed:** "3 git hooks are the stock hooks
-  git-lfs, husky or yorkie write, byte for byte".
+  git-lfs, husky or yorkie write". The line does not say "byte for byte":
+  for husky and yorkie hooks that holds apart from the two normalised lines.
 - **husky and yorkie hooks are hashed after two lines are normalised**,
   because both write the installing user's home and the package folder into
   every hook, so no single hash could match two machines:
@@ -66,8 +67,6 @@ A review line nobody can act on teaches people to skip review lines.
 - The field drive's 70 reviews of these kinds go away.
 - A hook from a version not listed, or written by husky on Windows, stays a
   review line. That errs towards a look.
-- The ok line says "byte for byte", which for husky and yorkie hooks is true
-  apart from the two normalised lines.
 - The list has to be kept: a new git-lfs release that changes its hook text
   needs a new line, produced the same way, before its hooks stop being
   reviewed.

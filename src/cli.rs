@@ -47,6 +47,10 @@ pub const ACCEPTED: &[(&str, &str)] = &[
         "start again, even if an unfinished check could continue",
     ),
     (
+        "--git-all",
+        "also read every commit and object git keeps. Slower",
+    ),
+    (
         "--ioc DIR",
         "indicator set. Defaults to ioc/ beside the binary",
     ),
@@ -251,6 +255,9 @@ pub struct Args {
     pub resume: bool,
     /// Start again without asking, even if an unfinished check could continue.
     pub fresh: bool,
+    /// Read every commit and object of each git repository, not only what a
+    /// checkout can bring back. ADR-0068.
+    pub git_all: bool,
 }
 
 /// Parse and validate. Returns only arguments it is safe to act on.
@@ -268,6 +275,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
     let mut scope_flags: Vec<(String, Option<String>)> = Vec::new();
     let (mut forge_state, mut evidence) = (None, None);
     let (mut resume, mut fresh) = (false, false);
+    let mut git_all = false;
 
     // The subcommand, when present. `check` is the default.
     let command = match args.peek().map(String::as_str) {
@@ -343,6 +351,14 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
                     &[Command::Clean, Command::Guide, Command::PurgeEvidence],
                 )?;
                 fresh = true;
+            }
+            "--git-all" => {
+                not_for(
+                    "--git-all",
+                    &[Command::Clean, Command::Guide, Command::PurgeEvidence],
+                )?;
+                scope_flags.push(("--git-all".into(), None));
+                git_all = true;
             }
             "--report" => {
                 not_for_purge("--report")?;
@@ -529,6 +545,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         scope_flags,
         resume,
         fresh,
+        git_all,
     })
 }
 
@@ -575,7 +592,7 @@ pub fn usage() -> String {
     for (flag, help) in ACCEPTED {
         s.push_str(&format!("  {flag:<18} {help}\n"));
     }
-    s.push_str("\nclean takes --apply, --quarantine, --report and --ioc. It never touches git:\nnothing is staged, committed, reset or stashed, and the original of every\nfile it changes is kept in quarantine.\n");
+    s.push_str("\nclean takes --apply, --quarantine, --report and --ioc. It never changes git:\nnothing is staged, committed, reset or stashed. It reads each repository's\nhistory and says when git still holds the payload. The original of every file\nit changes is kept in quarantine.\n");
     s.push_str("\nExit codes: 0 clean - 1 review items only - 2 a confirmed indicator\n            3 the scan could not run.\n");
     s
 }
@@ -856,6 +873,31 @@ mod tests {
             Err(Rejection::VersionRequested)
         ));
         assert!(version().starts_with(env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn git_all_is_for_a_check() {
+        let ioc = ioc_fixture("git-all");
+        let a = parse(args(&["--git-all", "/tmp"]).into_iter(), ioc.clone()).expect("ok");
+        assert!(a.git_all);
+        assert!(a
+            .scope_flags
+            .iter()
+            .any(|(flag, value)| flag == "--git-all" && value.is_none()));
+        for argv in [
+            vec!["clean", "--git-all", "/tmp"],
+            vec!["guide", "--git-all"],
+        ] {
+            let e = parse(args(&argv).into_iter(), ioc.clone()).expect_err("must refuse");
+            assert!(
+                matches!(e, Rejection::NotForCommand { .. }),
+                "{argv:?}: {e:?}"
+            );
+        }
+        assert!(usage().contains(
+            "  --git-all          also read every commit and object git keeps. Slower\n"
+        ));
+        assert!(usage().contains("It never changes git:"));
     }
 
     #[test]

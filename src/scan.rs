@@ -29,6 +29,8 @@ pub struct Scope<'a> {
     /// Whether the files under `home` may be read: false under --fs-only
     /// when the home is this machine's and was not named. ADR-0069.
     pub home_read: bool,
+    /// Read every commit and object of each git repository. ADR-0068.
+    pub git_all: bool,
     /// The machine, when its live state is to be read. `None` skips the host
     /// checks and says so.
     pub host: Option<&'a dyn Host>,
@@ -73,6 +75,13 @@ pub enum Event<'a> {
         n: usize,
         of: Option<usize>,
         /// How long the step has been running. ADR-0070.
+        elapsed: Duration,
+    },
+    /// How many of the git repositories the walk found have been read, in
+    /// step 2. ADR-0068.
+    Repos {
+        n: usize,
+        of: usize,
         elapsed: Duration,
     },
     /// A confirmed or review finding, the moment it is made.
@@ -123,6 +132,11 @@ impl Stream<'_> {
             of,
             elapsed,
         });
+    }
+
+    fn repos(&mut self, n: usize, of: usize) {
+        let elapsed = self.started.elapsed();
+        (self.tell)(Event::Repos { n, of, elapsed });
     }
 
     fn done(&mut self, v: &mut Verdict) {
@@ -340,6 +354,19 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     if scope.resume.is_some() {
         v.set_skipped(skipped);
     }
+    s.flush(v);
+    // What git would put back. Read by git, never changed. ADR-0068.
+    crate::git_local::history(
+        &w,
+        ind,
+        crate::git_local::Options {
+            all: scope.git_all,
+            budget: Some(crate::git_local::BUDGET),
+            program: "git",
+        },
+        v,
+        &mut |n, of| s.repos(n, of),
+    );
     // The home directory is swept only when this machine is being read. A
     // disk checked with --fs-only gets the .env count and nothing more.
     checks::credentials(&w, host.and(scope.home), v);
@@ -397,6 +424,11 @@ pub fn render(v: &Verdict, target: Target) -> String {
             }
             Entry::Note(line) => {
                 if target == Target::Report {
+                    out.push_str(&format!("    {}\n", clean(line)));
+                }
+            }
+            Entry::Brief(line) => {
+                if target == Target::Console {
                     out.push_str(&format!("    {}\n", clean(line)));
                 }
             }
@@ -574,6 +606,7 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
     let not_strippable = count(|k| matches!(k, Kind::Config { strippable: false }));
     let packages = count(|k| matches!(k, Kind::Package));
     let releases = count(|k| matches!(k, Kind::HijackedRelease));
+    let histories = count(|k| matches!(k, Kind::GitHistory));
     let by_hand = count(|k| matches!(k, Kind::StartupFile));
     let cleaning = run.command == "clean";
 
@@ -675,6 +708,13 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
         step(
             &mut out,
             "Change each hijacked package named above to another release: pin any other release, delete node_modules and reinstall.",
+            None,
+        );
+    }
+    if histories > 0 {
+        step(
+            &mut out,
+            "In each git repository named above, commit the cleaned files before any git restore, reset or checkout, then delete or rewrite the branches and stashes named. Delete a bare backup that holds the payload, or keep it offline.",
             None,
         );
     }

@@ -1,0 +1,44 @@
+{
+  "why": "Branches, remote branches, tags and stashes without the payload must not produce a finding. This repository has three branches, a tag and a stash, all clean, and a plain clone with two remote branches: both are read and the ok line counts what was read (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n"
+          }
+        },
+        {
+          "branch": "dev",
+          "files": {
+            "src/a.js": "export const a = 1\n"
+          }
+        },
+        {
+          "branch": "release",
+          "files": {
+            "src/b.js": "export const b = 2\n"
+          }
+        }
+      ],
+      "tags": {
+        "v1": "main"
+      },
+      "stash": {
+        "notes.txt": "later\n"
+      }
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "tree_may_change": false,
+    "findings": [],
+    "must_print": [
+      "1 git repository read (last commits, staged files, 4 branches and tags, 1 stash), none holds the payload"
+    ]
+  }
+}
