@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { asides } from './src/markdown/asides.mjs';
 import { baseLinks } from './src/markdown/base-links.mjs';
-import { BASE, SITE_ORIGIN } from './src/siteConfig.mjs';
+import { ANALYTICS_ON, BASE, SITE_ORIGIN } from './src/siteConfig.mjs';
 import { pagefindIndex } from './src/markdown/pagefind.mjs';
 import { outboundLinks } from './src/markdown/outbound-links.mjs';
 import { ogImages } from './src/markdown/og-images.mjs';
@@ -81,6 +81,21 @@ export default defineConfig({
     // on editorial links, ref=polinriderscanner.com (src/markdown/outbound-links.mjs).
     outboundLinks({ origin: SITE_ORIGIN, base: BASE }),
     pagefindIndex(),
+    // PostHog web analytics (src/scripts/analytics.ts, ADR-0066), added to
+    // every page only when src/siteConfig.mjs switches it on. Without a key
+    // the integration is absent, so the build carries no PostHog code at
+    // all, not even an unused file.
+    ...(ANALYTICS_ON
+      ? [
+          {
+            name: 'polinrider-analytics',
+            hooks: {
+              'astro:config:setup': ({ injectScript }) =>
+                injectScript('page', `import ${JSON.stringify(`${src}/scripts/analytics.ts`)};`),
+            },
+          },
+        ]
+      : []),
   ],
 
   markdown: {

@@ -29,22 +29,31 @@ export const SITE_DESCRIPTION =
 export const REPO_URL = 'https://github.com/meSingh/polinrider-scanner';
 export const EDIT_URL = `${REPO_URL}/edit/main/docs-site/`;
 
-// Cloudflare Web Analytics, in its JS-snippet mode (the domain is DNS-only,
-// not proxied). The token is from the Cloudflare dashboard (Analytics &
-// Logs, Web Analytics) and is public: it appears in every page that loads
-// the beacon. The beacon counts page views without cookies.
-export const CF_WEB_ANALYTICS_TOKEN = '916d6aa6c9094d828ac628070245e65c';
+// PostHog web analytics, on PostHog's EU cloud (ADR-0066). Nothing is
+// injected until the build's environment holds the project's key in
+// PUBLIC_POSTHOG_KEY, set as a repository variable and passed in by
+// .github/workflows/docs.yml. The key is public: PostHog calls it a project
+// token, and it appears in every page that counts. A value that is not one
+// fails the build, so a mistyped variable never ships a broken snippet.
+//
+// What the script does is in src/scripts/analytics.ts: cookieless, nothing
+// stored on the visitor's device, no person profiles, page views, page
+// leaves and two named clicks, nothing else.
+export const POSTHOG_KEY = (process.env.PUBLIC_POSTHOG_KEY ?? '').trim();
+export const POSTHOG_HOST = 'https://eu.i.posthog.com';
+
+if (POSTHOG_KEY && !/^phc_[A-Za-z0-9]{20,64}$/.test(POSTHOG_KEY)) {
+  throw new Error(
+    'PUBLIC_POSTHOG_KEY is not a PostHog project key (phc_ followed by letters and digits). ' +
+      'Set the repository variable to the project token from PostHog, Settings, Project.',
+  );
+}
 
 // Only the real site is counted: a production build for PRODUCTION_ORIGIN
-// at the root gets Cloudflare's snippet exactly as Cloudflare gives it. Dev
-// servers, local builds for any other address and the GitHub Pages site get
-// no beacon.
+// at the root, with a key. Dev servers, local builds for any other address
+// and the GitHub Pages site load no analytics.
 export const ANALYTICS_ON =
-  Boolean(CF_WEB_ANALYTICS_TOKEN) && SITE_ORIGIN === PRODUCTION_ORIGIN && BASE === '' && process.env.NODE_ENV === 'production';
-
-if (CF_WEB_ANALYTICS_TOKEN && !/^[A-Za-z0-9]+$/.test(CF_WEB_ANALYTICS_TOKEN)) {
-  throw new Error(`CF_WEB_ANALYTICS_TOKEN is not a Cloudflare Web Analytics token: ${CF_WEB_ANALYTICS_TOKEN}`);
-}
+  Boolean(POSTHOG_KEY) && SITE_ORIGIN === PRODUCTION_ORIGIN && BASE === '' && process.env.NODE_ENV === 'production';
 
 // Search engine ownership checks. Each is the `content` value of the meta tag
 // that Google Search Console (URL-prefix property, HTML tag method) or Bing

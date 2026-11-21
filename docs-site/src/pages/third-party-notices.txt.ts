@@ -1,8 +1,9 @@
 // The licence notices of what this site ships to a browser: Astro's page
 // scripts, Pagefind's search (its script, WebAssembly and index format),
-// Shiki's code colours, the GitHub mark from Primer Octicons and the Geist
-// typeface. The code is MIT licensed, and the
-// MIT licence asks that its notice travel with copies of the software. Geist
+// Shiki's code colours, the GitHub mark from Primer Octicons, the Geist
+// typeface and, while analytics is on, PostHog's script. The code is MIT
+// licensed (PostHog's Apache-2.0 and MIT), and both licences ask that the
+// notice travel with copies of the software. Geist
 // is under the SIL Open Font License 1.1, which asks the same of its notice
 // and licence. This page is that copy, served at
 // /third-party-notices.txt under the site base. The code's notices are read
@@ -12,8 +13,10 @@
 import type { APIRoute } from 'astro';
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { ANALYTICS_ON } from '../siteConfig.mjs';
 
-const packages = ['astro', 'pagefind', 'shiki', '@shikijs/themes'];
+// posthog-js only while analytics is on: a build without a key ships none of it.
+const packages = ['astro', 'pagefind', 'shiki', '@shikijs/themes', ...(ANALYTICS_ON ? ['posthog-js'] : [])];
 
 const notice = (name: string) => {
   const dir = join(process.cwd(), 'node_modules', name);
