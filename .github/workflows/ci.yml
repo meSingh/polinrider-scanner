@@ -35,6 +35,12 @@ jobs:
           find . -name '*.sh' -not -path './.git/*' -print0 \
             | xargs -0 shellcheck --severity=warning --external-sources
 
+      # The Traffic log's scripts: how the traffic branch's numbers become
+      # PostHog events, tested against a copy of that data and a stand-in
+      # for PostHog. The runner's Python, nothing installed.
+      - name: Traffic log scripts
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
       # Dependabot only reads .github/workflows, so the pin in the template that
       # users vendor into their own repositories drifts silently. Fail here
       # instead of shipping them a stale action.
