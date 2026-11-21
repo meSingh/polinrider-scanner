@@ -93,6 +93,8 @@ A `home` map is written under the fixture's home directory, for startup files,
 
 An `args` list adds flags to the case's run, as `then.args` does for a second
 run of the same tree.
+`"home_flag": false` runs without `--home`, with the fixture home as `$HOME`:
+the home is then the machine's own, as it is when nobody names one.
 
 **An absent file is not an empty file.** Empty means the question was asked and
 the answer was nothing. Absent means nobody asked, and the scan has to say so

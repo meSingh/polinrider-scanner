@@ -1,0 +1,30 @@
+{
+  "why": "--fs-only promises only the checks that read the filesystem being scanned, and $HOME is this machine, not that filesystem. The 2026-11-16 field report found ~/.ssh/authorized_keys read anyway. Here the home holds the campaign's SSH key and a file at an implant install path, and the run is not told --home, so the home is the machine's own: neither may be read. If either were, the exit would be 2 and the promise false. Each section that was not read says so in a line, so a skipped check is never mistaken for a clean one (ADR-0069).",
+  "home_flag": false,
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {
+    ".ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOwnerOwnKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAA owner@laptop\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCattackerKeyStandInAAAAAAAAAAAAAAAAAAAA bink@DESKTOP-N8JGD6T\n",
+    ".local/share/MicrosoftSystem64": "stand-in for the implant binary\n"
+  },
+  "expect": {
+    "exit": 0,
+    "tree_may_change": false,
+    "findings": [],
+    "must_print": [
+      "Second-stage implant: install paths skipped, --fs-only",
+      "SSH keys that let someone in: skipped, --fs-only",
+      "Python installed in the home folder: skipped, --fs-only",
+      "global core.hooksPath: skipped, --fs-only"
+    ],
+    "must_not_print": [
+      "authorized_keys",
+      "MicrosoftSystem64",
+      "bink@DESKTOP-N8JGD6T"
+    ]
+  }
+}

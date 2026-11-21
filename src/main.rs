@@ -159,6 +159,9 @@ fn main() -> ProcExit {
         ioc_dir: &args.ioc,
         ind: &ind,
         home: if clean { None } else { Some(&args.home) },
+        // Under --fs-only, $HOME is this machine's and is not read; a home
+        // named with --home is part of the disk being checked. ADR-0069.
+        home_read: !args.fs_only || args.home_named,
         host,
         on_infected_config: if clean {
             OnInfectedConfig::Strip

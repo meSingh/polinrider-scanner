@@ -891,9 +891,9 @@ impl GitHooks {
         match host {
             Some(host) => host_checks::git_global_config(host, v),
             // The global hooksPath lives in the user's git config, which is
-            // host state; under --fs-only it is not read. Reported as ok so
-            // the section always says something rather than printing nothing.
-            None => v.push(Finding::ok("no global core.hooksPath")),
+            // host state; under --fs-only it is not read, and the section
+            // says so rather than claiming there is none. ADR-0069.
+            None => v.push(Finding::info("global core.hooksPath: skipped, --fs-only")),
         }
         Self
     }
@@ -1030,6 +1030,9 @@ pub fn implant_installs(ind: &Indicators, scope: &ImplantScope, v: &mut Verdict,
                     // A path from the root of a Unix system means nothing on
                     // Windows, where it would be read against the current drive.
                     None if cfg!(windows) => continue,
+                    // And it is this machine's root, not the disk's: with no
+                    // host to read, it is not read. ADR-0069.
+                    None if host.is_none() => continue,
                     None => Path::new(line).to_path_buf(),
                 }
             };
@@ -1057,7 +1060,7 @@ pub fn implant_installs(ind: &Indicators, scope: &ImplantScope, v: &mut Verdict,
     let Some(host) = host else {
         if !found {
             v.push(Finding::ok(
-                "no second-stage implant at its install paths (--fs-only: process table not read)",
+                "no second-stage implant at its install paths in the home folder (--fs-only: /tmp and the process table not read)",
             ));
         }
         return;
@@ -1811,6 +1814,57 @@ mod tests {
         assert_eq!(
             agent,
             vec!["stop it first: launchctl bootout gui/$(id -u) '/Users/x/Library/LaunchAgents/com.helper.plist' 2>/dev/null || launchctl unload '/Users/x/Library/LaunchAgents/com.helper.plist'"]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn with_no_host_a_path_from_this_machines_root_is_never_read() {
+        // Under --fs-only the root is this machine's, not the disk's: an
+        // implant file there is not looked for, and the line says so.
+        // ADR-0069.
+        let dir = scratch("no-root");
+        let home = dir.join("home");
+        let ioc = dir.join("ioc");
+        let on_root = dir.join("tmp/0001.dat");
+        put(&on_root, "binary\n");
+        put(
+            &ioc.join("implant-paths.txt"),
+            &format!("{}\n~/.local/share/helper\n", on_root.display()),
+        );
+        fs::create_dir_all(&home).unwrap();
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let mut v = Verdict::new();
+        implant_installs(
+            &Indicators::default(),
+            &ImplantScope {
+                home: Some(&home),
+                ioc_dir: &ioc,
+                host: None,
+            },
+            &mut v,
+            &mut Sink::Dry(&q),
+        );
+        assert_eq!(v.hits(), 0);
+        let said: Vec<&str> = v.findings().map(|f| f.message.as_str()).collect();
+        assert_eq!(
+            said,
+            vec!["no second-stage implant at its install paths in the home folder (--fs-only: /tmp and the process table not read)"]
+        );
+
+        // The global hooksPath is host state: not read, and not claimed absent.
+        let mut v = Verdict::new();
+        let _ = GitHooks::open(None, &mut v);
+        let said: Vec<(crate::verdict::Level, &str)> = v
+            .findings()
+            .map(|f| (f.level, f.message.as_str()))
+            .collect();
+        assert_eq!(
+            said,
+            vec![(
+                crate::verdict::Level::Info,
+                "global core.hooksPath: skipped, --fs-only"
+            )]
         );
         let _ = fs::remove_dir_all(&dir);
     }

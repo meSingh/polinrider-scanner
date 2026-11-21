@@ -234,6 +234,9 @@ pub struct Args {
     pub report: Option<PathBuf>,
     pub ioc: PathBuf,
     pub home: PathBuf,
+    /// Whether the home directory was named with --home. Under --fs-only only
+    /// a named home is read: $HOME is this machine's. ADR-0069.
+    pub home_named: bool,
     /// Host state supplied as files, instead of read from this machine.
     pub host_state: Option<PathBuf>,
     /// GitHub's answers supplied as files, instead of asked of GitHub.
@@ -437,6 +440,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         return Err(Rejection::BadIoc { path: ioc });
     }
 
+    let home_named = home.is_some();
     let home = home
         .or_else(|| std::env::var_os("HOME").map(PathBuf::from))
         .or_else(|| std::env::var_os("USERPROFILE").map(PathBuf::from))
@@ -518,6 +522,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         report,
         ioc,
         home,
+        home_named,
         host_state,
         forge_state,
         evidence,
@@ -851,6 +856,21 @@ mod tests {
             Err(Rejection::VersionRequested)
         ));
         assert!(version().starts_with(env!("CARGO_PKG_VERSION")));
+    }
+
+    #[test]
+    fn the_home_is_named_only_by_the_home_flag() {
+        // Under --fs-only only a named home is read. ADR-0069.
+        let ioc = ioc_fixture("home-named");
+        let a = parse(args(&["--fs-only", "/tmp"]).into_iter(), ioc.clone()).expect("ok");
+        assert!(!a.home_named);
+        let a = parse(
+            args(&["--fs-only", "--home", "/mnt/old/home/x", "/tmp"]).into_iter(),
+            ioc,
+        )
+        .expect("ok");
+        assert!(a.home_named);
+        assert_eq!(a.home, PathBuf::from("/mnt/old/home/x"));
     }
 
     #[test]

@@ -633,6 +633,7 @@ fn local(
         ioc_dir: session.ioc_dir,
         ind: session.ind,
         home: (what == What::Computer).then_some(session.home),
+        home_read: true,
         host: if what == What::Computer {
             session.host
         } else {
@@ -1909,6 +1910,7 @@ mod tests {
             ioc_dir: &w.dir.join("ioc"),
             ind: &ind,
             home: None,
+            home_read: true,
             host: None,
             on_infected_config: OnInfectedConfig::Report,
             report: None,

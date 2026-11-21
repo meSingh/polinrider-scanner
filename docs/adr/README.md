@@ -64,7 +64,7 @@ If you disagree with one, open an issue and quote its number.
 | [0046](./0046-purge-evidence-deletes-only-polinriders-own-copies.md) | Let `--purge-evidence` delete polinrider's own copies, and nothing else | Accepted |
 | [0047](./0047-the-folder-and-computer-checks-read-weak-txt.md) | The folder and computer checks read `weak.txt` | Accepted |
 | [0048](./0048-a-review-level-filename-list.md) | Add a review-level filename list | Accepted |
-| [0049](./0049-the-computer-check-reads-authorized-keys.md) | The computer check reads `~/.ssh/authorized_keys` | Accepted |
+| [0049](./0049-the-computer-check-reads-authorized-keys.md) | The computer check reads `~/.ssh/authorized_keys` | Accepted; amended by [ADR-0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) |
 | [0050](./0050-a-node-process-running-the-implants-script-is-the-implant.md) | A `node` process running a script from the implant's folder is the implant | Accepted |
 | [0051](./0051-the-github-check-compares-known-hashes.md) | The GitHub check compares the small files against the known hashes | Accepted |
 | [0052](./0052-content-patterns-at-the-confirmed-tier.md) | Match campaign patterns in file contents | Accepted; its rule that a pattern match is not stripped is superseded by [ADR-0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) |
@@ -81,6 +81,7 @@ If you disagree with one, open an issue and quote its number.
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 | [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted; amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
 | [0067](./0067-the-posthog-project-is-on-its-us-cloud.md) | The PostHog project is on PostHog's US cloud | Accepted |
+| [0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) | Under --fs-only, read a home only when it is named | Accepted |
 | [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |
 
 ## Adding one

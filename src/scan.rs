@@ -26,6 +26,9 @@ pub struct Scope<'a> {
     /// has one. `None` when it is of the given directories and nothing else,
     /// which is what `clean` does.
     pub home: Option<&'a Path>,
+    /// Whether the files under `home` may be read: false under --fs-only
+    /// when the home is this machine's and was not named. ADR-0069.
+    pub home_read: bool,
     /// The machine, when its live state is to be read. `None` skips the host
     /// checks and says so.
     pub host: Option<&'a dyn Host>,
@@ -169,23 +172,31 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     // What the machine itself holds comes first: it needs no walk.
     s.start(1);
     if let Some(home) = scope.home {
-        checks::implant_installs(
-            ind,
-            &ImplantScope {
-                home: Some(home),
-                ioc_dir: scope.ioc_dir,
-                host,
-            },
-            v,
-            sink,
-        );
+        if scope.home_read {
+            checks::implant_installs(
+                ind,
+                &ImplantScope {
+                    home: Some(home),
+                    ioc_dir: scope.ioc_dir,
+                    host,
+                },
+                v,
+                sink,
+            );
+        } else {
+            v.section("Second-stage implant: install paths skipped, --fs-only");
+        }
         s.flush(v);
         if host.is_some() {
             checks::extensions(&extension_dirs(home), ind, v, sink);
         } else {
             skipped(v, "IDE extensions");
         }
-        checks::ssh_keys(home, ind, v);
+        if scope.home_read {
+            checks::ssh_keys(home, ind, v);
+        } else {
+            skipped(v, "SSH keys that let someone in");
+        }
         match host {
             Some(host) => {
                 host_checks::persistence(host, home, ind, v, sink);
@@ -274,7 +285,15 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     v.append(tasks_v);
     v.append(configs_v);
     v.append(hooks_v);
-    runtimes::python_startup(&w, scope.home, host, ind, v, sink);
+    runtimes::python_startup(
+        &w,
+        scope.home.filter(|_| scope.home_read),
+        scope.home.is_some() && !scope.home_read,
+        host,
+        ind,
+        v,
+        sink,
+    );
     s.flush(v);
     s.done(v);
 

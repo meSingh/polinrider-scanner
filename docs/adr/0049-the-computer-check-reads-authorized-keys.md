@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) |
 | **Date** | 2026-10-26 |
 
 ## Context

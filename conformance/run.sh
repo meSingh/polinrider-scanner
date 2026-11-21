@@ -136,7 +136,15 @@ impl_rust() {
     # the flags that would say otherwise.
     args=(clean)
   else
-    args=(check --home "$FAKE_HOME")
+    # "home_flag": false runs without --home, with the fixture home as $HOME:
+    # the home is then this machine's, which --fs-only must not read
+    # (ADR-0069). Always inside $(...), so HOME is set for this run only.
+    if [[ "$HOME_FLAG" == "false" ]]; then
+      export HOME="$FAKE_HOME"
+      args=(check)
+    else
+      args=(check --home "$FAKE_HOME")
+    fi
     # A host case supplies the machine; every other case reads no host state.
     if [[ -n "$HOST_STATE" ]]; then args+=(--host-state "$HOST_STATE"); else args+=(--fs-only); fi
   fi
@@ -315,6 +323,7 @@ run_case() {
   KILL_WHEN="$(jq -r '.kill.when // empty' "$cf")"
   KILL_IN="$(jq -r '.kill.in // "report"' "$cf")"
   EXTRA_ARGS=()
+  HOME_FLAG="$(jq -r 'if has("home_flag") then .home_flag else true end' "$cf")"
   # Flags of the case's own for its first run, as then.args are for a second.
   while IFS= read -r ed; do EXTRA_ARGS+=("$ed"); done < <(jq -r '.args[]? // empty' "$cf")
 
