@@ -53,6 +53,99 @@ pub struct Indicators {
     /// SHA-256 of files known from the campaign, lowercase, each with its
     /// label. From `hashes.txt`, `<sha256> <label>` per line.
     pub hashes: Vec<(String, String)>,
+    /// Files tools write the same way everywhere, by SHA-256, each with its
+    /// kind and label, from `stock-files.txt`. A match keeps a file out of
+    /// review; it never clears an indicator. ADR-0072.
+    pub stock: Vec<(String, Stock, String)>,
+}
+
+/// What a stock file is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stock {
+    /// A git hook, hashed after [`normalise_hook`].
+    Hook,
+    /// A Python startup file, hashed as it is.
+    Pth,
+}
+
+/// `<sha256>  <hook|pth>  <label>`. A line in any other form is not used,
+/// as in `hashes.txt`: a list that can only keep files out of review is
+/// never widened by a line it cannot read.
+fn stock_line(line: &str) -> Option<(String, Stock, String)> {
+    let mut fields = line.split_whitespace();
+    let hash = fields.next()?.to_ascii_lowercase();
+    let kind = match fields.next()? {
+        "hook" => Stock::Hook,
+        "pth" => Stock::Pth,
+        _ => return None,
+    };
+    let label = fields.collect::<Vec<_>>().join(" ");
+    (hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit()) && !label.is_empty())
+        .then_some((hash, kind, label))
+}
+
+/// A hook as husky and yorkie would have written it on any machine: two
+/// lines they fill in per install are put in a standard form, and only when
+/// they have exactly the form those tools write. Every other byte is kept.
+/// ADR-0072.
+///
+/// - `load_nvm NVM_DIR <path>` (husky) or `load_nvm <path>` (yorkie), where
+///   the path is `/home/<name>/.nvm`, `/Users/<name>/.nvm` or `/root/.nvm`
+///   and the name is letters, digits, `.`, `_` and `-`, and not `.` or `..`.
+/// - `cd <dir>` (husky) or `cd "<dir>"` (yorkie), where the folder is
+///   relative, of letters, digits, `.`, `_`, `/` and `-`, with no `..`.
+pub fn normalise_hook(bytes: &[u8]) -> Vec<u8> {
+    fn name_ok(name: &str) -> bool {
+        !name.is_empty()
+            && name != "."
+            && name != ".."
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
+    }
+    fn nvm_ok(path: &str) -> bool {
+        path == "/root/.nvm"
+            || ["/home/", "/Users/"].iter().any(|home| {
+                path.strip_prefix(home)
+                    .and_then(|rest| rest.strip_suffix("/.nvm"))
+                    .is_some_and(name_ok)
+            })
+    }
+    fn dir_ok(dir: &str) -> bool {
+        !dir.is_empty()
+            && !dir.starts_with('/')
+            && !dir.contains("..")
+            && dir
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._/-".contains(&b))
+    }
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    for (i, line) in bytes.split(|b| *b == b'\n').enumerate() {
+        if i > 0 {
+            out.push(b'\n');
+        }
+        let text = std::str::from_utf8(line).unwrap_or("");
+        let standard = if text.strip_prefix("load_nvm NVM_DIR ").is_some_and(nvm_ok) {
+            Some("load_nvm NVM_DIR <home>/.nvm")
+        } else if text.strip_prefix("load_nvm ").is_some_and(nvm_ok) {
+            Some("load_nvm <home>/.nvm")
+        } else if text
+            .strip_prefix("cd \"")
+            .and_then(|rest| rest.strip_suffix('"'))
+            .is_some_and(dir_ok)
+        {
+            Some("cd \"<dir>\"")
+        } else if text.strip_prefix("cd ").is_some_and(dir_ok) {
+            Some("cd <dir>")
+        } else {
+            None
+        };
+        match standard {
+            Some(line) => out.extend_from_slice(line.as_bytes()),
+            None => out.extend_from_slice(line),
+        }
+    }
+    out
 }
 
 /// Why the indicator set could not be used. Each of these is an exit code 3
@@ -135,6 +228,7 @@ pub const FILES: &[&str] = &[
     "strong-patterns.txt",
     "ssh-keys.txt",
     "hashes.txt",
+    "stock-files.txt",
 ];
 
 /// `name@version`, split at the last `@` that does not open a scope. Both
@@ -196,6 +290,10 @@ impl Indicators {
                     Some((h.to_ascii_lowercase(), label.trim().to_string()))
                 })
                 .collect(),
+            stock: read_list(dir, "stock-files.txt", false)?
+                .iter()
+                .filter_map(|l| stock_line(l))
+                .collect(),
         };
 
         if indicators.strong.is_empty() && indicators.bad_packages.is_empty() {
@@ -215,6 +313,28 @@ impl Indicators {
             .iter()
             .find(|(h, _)| *h == digest)
             .map(|(_, label)| label.as_str())
+    }
+
+    /// The label of the stock hook these bytes are, if they are one, once
+    /// [`normalise_hook`] has put the per-install lines in standard form.
+    pub fn stock_hook(&self, bytes: &[u8]) -> Option<&str> {
+        self.stock_of(Stock::Hook, &normalise_hook(bytes))
+    }
+
+    /// The label of the stock Python startup file these bytes are, if any.
+    pub fn stock_pth(&self, bytes: &[u8]) -> Option<&str> {
+        self.stock_of(Stock::Pth, bytes)
+    }
+
+    fn stock_of(&self, kind: Stock, bytes: &[u8]) -> Option<&str> {
+        if !self.stock.iter().any(|(_, k, _)| *k == kind) {
+            return None;
+        }
+        let digest = crate::sha256::bytes(bytes);
+        self.stock
+            .iter()
+            .find(|(h, k, _)| *k == kind && *h == digest)
+            .map(|(_, _, label)| label.as_str())
     }
 
     /// Does this text contain a confirmed indicator, as written or once its
@@ -637,6 +757,127 @@ fn names_endpoint(line: &str, indicator: &str) -> bool {
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
+
+    /// husky 0.13.4's pre-commit hook, as its install script wrote it in the
+    /// development container: home /home/dev, package at the repository root.
+    const HUSKY_PRE_COMMIT: &str = r##"#!/bin/sh
+#husky 0.13.4
+
+command_exists () {
+  command -v "$1" >/dev/null 2>&1
+}
+
+load_nvm () {
+  export $1=$2
+  [ -s "$2/nvm.sh" ] && . $2/nvm.sh
+  command_exists nvm && [ -f .nvmrc ] && nvm use
+}
+
+has_hook_script () {
+  [ -f package.json ] && cat package.json | grep -q "\"$1\"[[:space:]]*:"
+}
+
+cd .
+
+has_hook_script precommit || exit 0
+
+load_nvm NVM_DIR /home/dev/.nvm
+
+command_exists npm || {
+  echo >&2 "> husky - Can't find npm in PATH. Skipping precommit script in package.json"
+  exit 0
+}
+
+echo
+echo "> husky - npm run -s precommit"
+echo "> husky - node `node -v`"
+echo
+
+export GIT_PARAMS="$*"
+npm run -s precommit || {
+  echo
+  echo "> husky - pre-commit hook failed (add --no-verify to bypass)"
+  echo "> husky - to debug, use 'npm run precommit'"
+  exit 1
+}
+"##;
+
+    #[test]
+    fn a_stock_list_line_is_used_only_in_its_exact_form() {
+        let hash = "a".repeat(64);
+        assert_eq!(
+            stock_line(&format!(
+                "{}  hook  git-lfs 3.6.1 pre-push",
+                hash.to_uppercase()
+            )),
+            Some((hash.clone(), Stock::Hook, "git-lfs 3.6.1 pre-push".into()))
+        );
+        assert_eq!(
+            stock_line(&format!("{hash}  pth  coloredlogs")),
+            Some((hash.clone(), Stock::Pth, "coloredlogs".into()))
+        );
+        for bad in [
+            format!("{hash}  hook"),
+            format!("{hash}  script  label"),
+            format!("{}  hook  label", "a".repeat(63)),
+            format!("{}  hook  label", "g".repeat(64)),
+        ] {
+            assert_eq!(stock_line(&bad), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_husky_hook_is_the_same_on_every_machine_and_in_every_folder() {
+        let ind = Indicators {
+            stock: vec![(
+                crate::sha256::bytes(&normalise_hook(HUSKY_PRE_COMMIT.as_bytes())),
+                Stock::Hook,
+                "husky 0.13.4 pre-commit".into(),
+            )],
+            ..Indicators::default()
+        };
+        let installed = |home: &str, dir: &str| {
+            HUSKY_PRE_COMMIT
+                .replace(
+                    "load_nvm NVM_DIR /home/dev/.nvm",
+                    &format!("load_nvm NVM_DIR {home}"),
+                )
+                .replace("\ncd .\n", &format!("\ncd {dir}\n"))
+        };
+        for (home, dir) in [
+            ("/home/dev/.nvm", "."),
+            ("/Users/mandeep.singh/.nvm", "frontend"),
+            ("/root/.nvm", "apps/web-ui_2"),
+        ] {
+            let hook = installed(home, dir);
+            assert_eq!(
+                ind.stock_hook(hook.as_bytes()),
+                Some("husky 0.13.4 pre-commit"),
+                "{home} {dir}"
+            );
+        }
+        // Anything outside the two forms counts as it is, and is not stock.
+        for (home, dir) in [
+            ("/tmp/x/.nvm", "."),
+            ("/home/../.nvm", "."),
+            ("/home/a/b/.nvm", "."),
+            ("/home/dev/.nvm; curl x", "."),
+            ("/home/dev/.nvm", "../other"),
+            ("/home/dev/.nvm", "/etc"),
+            ("/home/dev/.nvm", "a;b"),
+            ("/home/dev/.nvm", "$(id)"),
+        ] {
+            let hook = installed(home, dir);
+            assert_eq!(ind.stock_hook(hook.as_bytes()), None, "{home} {dir}");
+        }
+        let extra = HUSKY_PRE_COMMIT.replace("cd .\n", "cd .\nnode .x.js\n");
+        assert_eq!(ind.stock_hook(extra.as_bytes()), None);
+        let mut longer = HUSKY_PRE_COMMIT.to_string();
+        longer.push('\n');
+        assert_eq!(ind.stock_hook(longer.as_bytes()), None);
+        // A Python file is never a hook, and a hook list never clears one.
+        assert_eq!(ind.stock_pth(HUSKY_PRE_COMMIT.as_bytes()), None);
+    }
 
     #[test]
     fn every_file_load_reads_is_in_the_digest_list() {

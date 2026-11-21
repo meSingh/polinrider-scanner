@@ -229,6 +229,11 @@ fn read_pth(text: &str, ind: &Indicators) -> Pth {
     if ind.has_strong(text) {
         return Pth::Indicator;
     }
+    // What a package installs, byte for byte: coloredlogs runs its own
+    // switch through an exec. ADR-0072.
+    if ind.stock_pth(text.as_bytes()).is_some() {
+        return Pth::Quiet;
+    }
     // site.py executes a line that starts with "import" and a space or a
     // tab, exactly. Everything else is a path, or a comment.
     let executes = |line: &&str| line.starts_with("import ") || line.starts_with("import\t");

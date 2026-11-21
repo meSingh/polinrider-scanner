@@ -57,7 +57,7 @@ If you disagree with one, open an issue and quote its number.
 | [0039](./0039-the-shell-machine-check-is-removed-and-the-corpus-holds-one-engine.md) | The shell machine check is removed, and the corpus holds one engine | Accepted |
 | [0040](./0040-indicators-are-matched-through-escape-codes-as-well.md) | Indicators are matched through escape codes as well | Accepted |
 | [0041](./0041-package-names-are-read-from-manifests-and-compared-whole.md) | Package names are read from manifests and compared whole | Proposed; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) |
-| [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed |
+| [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed; amended by [ADR-0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) |
 | [0043](./0043-packages-use-layouts-the-binary-already-searches-and-are-bumped-by-pull-request.md) | Package in layouts the binary already searches, and bump by pull request | Accepted |
 | [0044](./0044-a-guided-session-ends-on-what-it-came-to-and-offers-the-next-check.md) | End a guided session on what it came to, and offer the next check | Accepted |
 | [0045](./0045-small-files-the-checks-read-are-compared-by-hash.md) | Compare the small files the checks read against the known hashes | Accepted; amended by [ADR-0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) |
@@ -84,6 +84,7 @@ If you disagree with one, open an issue and quote its number.
 | [0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) | Under --fs-only, read a home only when it is named | Accepted |
 | [0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) | Tell a pipe once a minute that a step is still running | Accepted |
 | [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |
+| [0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) | Know stock hooks and startup files by hash, and leave generated output out of the long-line review | Accepted |
 
 ## Adding one
 

@@ -93,6 +93,10 @@ A `home` map is written under the fixture's home directory, for startup files,
 
 An `args` list adds flags to the case's run, as `then.args` does for a second
 run of the same tree.
+A `files_exact` map is written byte for byte, trailing newlines included, for
+files known by their hash; `files` drops a file's final newlines.
+`executable` lists tree paths to mark executable, such as git hooks.
+
 `"home_flag": false` runs without `--home`, with the fixture home as `$HOME`:
 the home is then the machine's own, as it is when nobody names one.
 

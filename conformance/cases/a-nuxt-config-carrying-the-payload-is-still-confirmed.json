@@ -1,0 +1,19 @@
+{
+  "why": "Only the long-line review is dropped under .nuxt, never the indicators: a payload appended behind the campaign's padding to a generated Nuxt config is confirmed exactly as anywhere else, exit 2 (ADR-0072).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/app/.nuxt/eslint.config.mjs": "export default []\n{{PAD}}{{STRONG}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "contains an indicator",
+        "path": ".nuxt/eslint.config.mjs"
+      }
+    ]
+  }
+}

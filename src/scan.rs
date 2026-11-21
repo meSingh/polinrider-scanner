@@ -289,6 +289,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
         )));
     }
     tasks.finish(&mut tasks_v);
+    hooks.finish(&mut hooks_v);
     let configs_stripped = configs.finish(&mut configs_v) > 0;
     v.append(tasks_v);
     v.append(configs_v);

@@ -210,6 +210,19 @@ build_files() {
   done < <(jq -r --arg k "$key" '.[$k] // {} | keys[]' "$cf")
 }
 
+# build_files_exact <case file> <key> <destination>: the same, byte for byte.
+# build_files loses the newlines a file ends with, which a file known by its
+# hash cannot spare.
+build_files_exact() {
+  local cf="$1" key="$2" dest="$3" path content
+  while IFS= read -r path; do
+    content="$(jq -j --arg k "$key" --arg p "$path" '.[$k][$p]' "$cf"; printf x)"
+    content="${content%x}"
+    mkdir -p "$dest/$(dirname "$path")"
+    subst "$content" > "$dest/$path"
+  done < <(jq -r --arg k "$key" '.[$k] // {} | keys[]' "$cf")
+}
+
 # build_forge <case file> <destination>: real git repositories for every
 # owner/repository/branch the case describes. Identity and signing are set on
 # the command line, so this works on a machine with no git configuration.
@@ -330,7 +343,11 @@ run_case() {
   # build the fixture: the tree to scan, the home directory, and for a host
   # case the machine's state
   build_files "$cf" files "$tmp/tree"
+  build_files_exact "$cf" files_exact "$tmp/tree"
   build_files "$cf" home "$FAKE_HOME"
+  # Files that must be executable, such as git hooks.
+  local x
+  while IFS= read -r x; do chmod +x "$tmp/tree/$x"; done < <(jq -r '.executable[]? // empty' "$cf")
   # Files too large to write out in a case: their first bytes, then zeros to
   # the size given in MB. For the large-file hash sweep (ADR-0059).
   # With "fill", the rest is that character instead: a large text file,

@@ -87,10 +87,14 @@ pub(crate) fn is_build_config(name: &str) -> bool {
         "gridsome.config",
         "vue.config",
     ];
+    // A declaration file is never run, whatever it is named:
+    // `tailwind.config.d.ts` is read as TypeScript source instead. ADR-0072.
+    let declaration = name.to_ascii_lowercase().ends_with(".d.ts");
     name == "truffle.js"
-        || STEMS
-            .iter()
-            .any(|s| name.starts_with(s) && name[s.len()..].starts_with('.'))
+        || !declaration
+            && STEMS
+                .iter()
+                .any(|s| name.starts_with(s) && name[s.len()..].starts_with('.'))
 }
 
 /// JavaScript and TypeScript source. Read for confirmed indicators as well as
@@ -380,7 +384,11 @@ impl BuildConfigs {
             );
         }
 
-        if body.lines().any(|l| l.len() > 4000) {
+        // Nuxt writes its own configs into .nuxt and rewrites them on every
+        // run, with config inlined on one line. The indicators, the known
+        // hashes and the payload-shaped tail still apply there. ADR-0072.
+        let generated = path.components().any(|c| c.as_os_str() == ".nuxt");
+        if !generated && body.lines().any(|l| l.len() > 4000) {
             self.flagged += 1;
             v.push(
                 Finding::review(format!(
@@ -936,7 +944,11 @@ fn installed_releases(dir: &Path, ind: &Indicators) -> Vec<(PathBuf, Vec<(String
 
 /// The git hook check, one `.git` directory at a time, so a scan can read
 /// each repository's hooks the moment the walk finds it. ADR-0059.
-pub struct GitHooks;
+/// Executable hooks in every `.git/hooks` the walk finds. A stock hook,
+/// known by `stock-files.txt`, is counted rather than sent for review.
+pub struct GitHooks {
+    stock: usize,
+}
 
 impl GitHooks {
     pub fn open(host: Option<&dyn Host>, v: &mut Verdict) -> Self {
@@ -948,7 +960,7 @@ impl GitHooks {
             // says so rather than claiming there is none. ADR-0069.
             None => v.push(Finding::info("global core.hooksPath: skipped, --fs-only")),
         }
-        Self
+        Self { stock: 0 }
     }
 
     pub fn inspect(&mut self, git_dir: &Path, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
@@ -963,6 +975,10 @@ impl GitHooks {
                     .at(&hook)
                     .with_remedy(line),
                 );
+            } else if fs::read(&hook).is_ok_and(|bytes| ind.stock_hook(&bytes).is_some()) {
+                // The hook git-lfs, husky or yorkie writes, and nothing else:
+                // it hands over to code checked elsewhere. ADR-0072.
+                self.stock += 1;
             } else {
                 v.push(
                     Finding::review(format!(
@@ -972,6 +988,19 @@ impl GitHooks {
                     .at(&hook),
                 );
             }
+        }
+    }
+
+    /// Close the section: how many hooks were stock ones, when any were.
+    pub fn finish(self, v: &mut Verdict) {
+        match self.stock {
+            0 => {}
+            1 => v.push(Finding::ok(
+                "1 git hook is the stock hook git-lfs, husky or yorkie writes, byte for byte",
+            )),
+            n => v.push(Finding::ok(format!(
+                "{n} git hooks are the stock hooks git-lfs, husky or yorkie write, byte for byte"
+            ))),
         }
     }
 }
@@ -987,6 +1016,7 @@ pub fn git_hooks(
     for git_dir in &walk.git_dirs {
         check.inspect(git_dir, ind, v, sink);
     }
+    check.finish(v);
 }
 
 /// The second-stage implant: known install and persistence paths, plus a hash
@@ -1886,6 +1916,41 @@ mod tests {
             agent,
             vec!["stop it first: launchctl bootout gui/$(id -u) '/Users/x/Library/LaunchAgents/com.helper.plist' 2>/dev/null || launchctl unload '/Users/x/Library/LaunchAgents/com.helper.plist'"]
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_declaration_file_is_not_a_build_config_and_nuxt_output_has_long_lines() {
+        assert!(is_build_config("tailwind.config.ts"));
+        assert!(!is_build_config("tailwind.config.d.ts"));
+        assert!(!is_build_config("eslint.config.D.TS"));
+        assert!(is_js_source("tailwind.config.d.ts"));
+
+        let dir = scratch("nuxt");
+        let long = format!("export default {{ a: '{}' }}\n", "x".repeat(5000));
+        let generated = dir.join("app/.nuxt/eslint.config.mjs");
+        let own = dir.join("app/eslint.config.mjs");
+        put(&generated, &long);
+        put(&own, &long);
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let mut v = Verdict::new();
+        let walk = Walk {
+            files: vec![generated, own.clone()],
+            ..Walk::default()
+        };
+        build_configs(
+            &walk,
+            &Indicators::default(),
+            OnInfectedConfig::Report,
+            &mut v,
+            &mut Sink::Dry(&q),
+        );
+        let reviewed: Vec<&Path> = v
+            .findings()
+            .filter(|f| f.level == crate::verdict::Level::Review)
+            .filter_map(|f| f.path.as_deref())
+            .collect();
+        assert_eq!(reviewed, vec![own.as_path()]);
         let _ = fs::remove_dir_all(&dir);
     }
 
