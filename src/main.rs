@@ -175,7 +175,7 @@ fn main() -> ProcExit {
     // Asked not to sleep for as long as the scan runs.
     let awake = Awake::hold();
     let mut painter = Painter { ui: &ui, drawn: 0 };
-    let mut on_screen = Screen::new(&args.roots, ui.live);
+    let mut on_screen = Screen::new(&args.roots, ui.live).beating();
     let mut in_file = Screen::new(&args.roots, false);
     if resume.is_some() {
         on_screen = on_screen.resumed();

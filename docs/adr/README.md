@@ -73,7 +73,7 @@ If you disagree with one, open an issue and quote its number.
 | [0056](./0056-the-docs-are-versioned-by-release-line.md) | Keep a frozen copy of the docs for each release line | Accepted |
 | [0057](./0057-the-repository-is-polinrider-scanner-from-3-0-0.md) | Rename the repository and its packages to polinrider-scanner, from 3.0.0 | Accepted |
 | [0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) | Confirm the var z and global.i tags, and read every JavaScript file | Accepted |
-| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
+| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) and [ADR-0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) |
 | [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted; amended by [ADR-0071](./0071-fresh-is-accepted-with-apply.md) |
 | [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
 | [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
@@ -82,6 +82,7 @@ If you disagree with one, open an issue and quote its number.
 | [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted; amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
 | [0067](./0067-the-posthog-project-is-on-its-us-cloud.md) | The PostHog project is on PostHog's US cloud | Accepted |
 | [0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) | Under --fs-only, read a home only when it is named | Accepted |
+| [0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) | Tell a pipe once a minute that a step is still running | Accepted |
 | [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |
 
 ## Adding one

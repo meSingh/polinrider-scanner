@@ -72,6 +72,8 @@ pub enum Event<'a> {
         step: usize,
         n: usize,
         of: Option<usize>,
+        /// How long the step has been running. ADR-0070.
+        elapsed: Duration,
     },
     /// A confirmed or review finding, the moment it is made.
     Found(&'a Finding),
@@ -114,7 +116,13 @@ impl Stream<'_> {
     fn count(&mut self, n: usize, of: Option<usize>, fresh: Vec<Finding>) {
         self.found(fresh);
         let step = self.step;
-        (self.tell)(Event::Count { step, n, of });
+        let elapsed = self.started.elapsed();
+        (self.tell)(Event::Count {
+            step,
+            n,
+            of,
+            elapsed,
+        });
     }
 
     fn done(&mut self, v: &mut Verdict) {
