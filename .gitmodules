@@ -1,3 +1,4 @@
 [submodule "action"]
 	path = action
 	url = https://github.com/meSingh/polinrider-action.git
+	branch = main
