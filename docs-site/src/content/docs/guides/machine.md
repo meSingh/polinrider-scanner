@@ -33,10 +33,12 @@ The `MicrosoftSystem64` implant first, malware from the same DPRK-linked group
 that this tool checks for alongside PolinRider
 ([why](/threat/#related-malware-microsoftsystem64)):
 its files, its process, and on Windows its scheduled task and Run entry. Then editor extensions, editor tasks that run on
-folder open, build configs, fake fonts, the script the payload spreads with,
-known-bad packages, Python startup files, what starts by itself, shell startup
-files and PowerShell profiles, git hooks, npm configuration and npm's own
-program files, interpreters running inline code and live connections. Last,
+folder open, build configs, fake fonts (`.woff`, `.woff2`, `.ttf` and `.otf`),
+the script the payload spreads with, known-bad packages and hijacked releases of
+real packages, Python startup files, what starts by itself, shell startup files
+and PowerShell profiles, git hooks, npm configuration and npm's own program
+files, the startup files of editors and apps, interpreters running inline code
+and live connections. Last,
 an inventory of the keys and credential files that would have to be changed if
 anything else is confirmed. They are counted and named, and never opened.
 
@@ -60,6 +62,19 @@ survive cleaning every repository:
   that every `npm` and `npx` command starts the payload again. npm's entry
   files are read in each installation in the usual places, including version
   managers. If one is confirmed, reinstall Node.js before running npm again.
+- **Editors and apps.** The campaign's second stage also changes the startup
+  files of VS Code, Cursor, Antigravity, Discord and GitHub Desktop, so the
+  payload starts each time one of them opens. Those files are read where each
+  app installs itself. A campaign marker in one, or the loader copy the
+  campaign leaves beside it, is confirmed: quit the app and install it again
+  from its maker's site. Leftover backup files, code hidden after a long run of
+  blank space and an oversized Discord startup file are listed for review.
+  Skipped with `--fs-only`.
+
+A hijacked release is a real package whose maintainer was compromised for a
+single version. Only that version is reported, from the lockfile or from the
+installed copy in `node_modules`, and the advice is to change to any other
+release and reinstall. Other releases of the same package are not reported.
 
 ## What changes, and when
 
