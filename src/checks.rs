@@ -438,6 +438,34 @@ pub struct ProjectFiles<'a> {
     pub configs_stripped: bool,
     /// Where a check that continues a stopped one picks the pass up.
     pub resume: Option<&'a crate::progress::Resume>,
+    /// Where the pass leaves the sizes it learned, for step 3. `None` for a
+    /// caller with no step 3 to hand them to.
+    pub sizes: Option<&'a std::cell::RefCell<Sizes>>,
+}
+
+/// What the pass over the project files learned of each file's size, so that
+/// step 3 does not ask for it again. Positions in `walk.files`, in order: the
+/// files whose size is in the hash sweep's range, and the files the pass
+/// never opened, whose size step 3 still has to ask for. Every other file was
+/// opened and is outside the range.
+#[derive(Debug, Default)]
+pub struct Sizes {
+    pub sweep: Vec<usize>,
+    pub unknown: Vec<usize>,
+}
+
+/// The first 8 KB of an open file, and the rest only when those hold no NUL
+/// byte: a binary file is read no further than it takes to say so. `None`
+/// for a binary file or one that cannot be read.
+fn read_text(file: &mut fs::File) -> Option<Vec<u8>> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    file.by_ref().take(8192).read_to_end(&mut bytes).ok()?;
+    if bytes.contains(&0) {
+        return None;
+    }
+    file.read_to_end(&mut bytes).ok()?;
+    Some(bytes)
 }
 
 /// What the pass tells the scan as it goes.
@@ -480,6 +508,7 @@ pub fn project_files(
     let mut weak_hits = 0usize;
     let mut found: Vec<PathBuf> = Vec::new();
     let mut skipped = crate::progress::Skipped::default();
+    let mut sizes = Sizes::default();
 
     for (n, path) in walk.files.iter().enumerate() {
         let before = sources.hits() + weak.reviews();
@@ -500,6 +529,7 @@ pub fn project_files(
                     skipped.reread += 1;
                 } else {
                     skipped.skipped += 1;
+                    sizes.unknown.push(n);
                     continue;
                 }
             }
@@ -507,23 +537,37 @@ pub fn project_files(
         let name = path.file_name().and_then(|x| x.to_str()).unwrap_or("");
         let tooling = is_tooling(path, files.roots);
         let as_source = is_js_source(name) && !is_build_config(name) && !tooling;
-        let as_weak = !ind.weak.is_empty()
+        let weak_candidate = !ind.weak.is_empty()
             && !tooling
             && reported.binary_search(path).is_err()
             // Editor files: tasks.json has a stricter check of its own, and
             // folderOpen in settings.json is a known false positive the
             // corpus pins (settings-json-is-not-tasks-json).
-            && !path.components().any(|c| c.as_os_str() == ".vscode")
-            && fs::metadata(path).is_ok_and(|m| m.len() <= 1024 * 1024);
+            && !path.components().any(|c| c.as_os_str() == ".vscode");
+        if !as_source && !weak_candidate {
+            sizes.unknown.push(n);
+            continue;
+        }
+        // Opened once: the size comes from the open file, not from a second
+        // look-up by path, and is kept for step 3.
+        let Ok(mut file) = fs::File::open(path) else {
+            sizes.unknown.push(n);
+            continue;
+        };
+        let size = file.metadata().map(|m| m.len()).ok();
+        match size {
+            Some(len) if SWEEP.contains(&len) => sizes.sweep.push(n),
+            Some(_) => {}
+            None => sizes.unknown.push(n),
+        }
+        let as_weak = weak_candidate && size.is_some_and(|len| len <= 1024 * 1024);
         if !as_source && !as_weak {
             continue;
         }
-        let Ok(bytes) = fs::read(path) else {
+        let Some(bytes) = read_text(&mut file) else {
             continue;
         };
-        if bytes.iter().take(8192).any(|b| *b == 0) {
-            continue;
-        }
+        drop(file);
         let text = String::from_utf8_lossy(&bytes);
 
         // The cheap question first, so a clean file is searched once.
@@ -571,6 +615,9 @@ pub fn project_files(
         }
     }
     pass_tick(tick, walk.files.len(), &mut sources, &mut weak);
+    if let Some(out) = files.sizes {
+        *out.borrow_mut() = sizes;
+    }
     if source_hits == 0 {
         sources.push(Finding::ok(format!(
             "{sources_read} JavaScript and TypeScript files read, none carries an indicator"
@@ -653,15 +700,21 @@ pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
             .file_name()
             .and_then(|n| n.to_str())
             .is_some_and(|n| is_truetype_name(&n.to_ascii_lowercase()));
-        let large = truetype && fs::metadata(path).is_ok_and(|m| m.len() > TRUETYPE_HASH_MAX);
+        let Ok(mut file) = fs::File::open(path) else {
+            continue;
+        };
+        let large = truetype && file.metadata().is_ok_and(|m| m.len() > TRUETYPE_HASH_MAX);
         let bytes = if large {
             // Its first four bytes decide; too large to be a published fake.
-            match first_bytes(path) {
+            match first_bytes_of(&mut file) {
                 Some(head) => head.to_vec(),
                 None => continue,
             }
         } else {
-            let Ok(bytes) = fs::read(path) else { continue };
+            let mut bytes = Vec::new();
+            if std::io::Read::read_to_end(&mut file, &mut bytes).is_err() {
+                continue;
+            }
             bytes
         };
 
@@ -1110,9 +1163,12 @@ pub(crate) fn starts_like_program(first: &[u8]) -> bool {
 }
 
 fn first_bytes(path: &Path) -> Option<[u8; 4]> {
+    first_bytes_of(&mut fs::File::open(path).ok()?)
+}
+
+fn first_bytes_of(file: &mut fs::File) -> Option<[u8; 4]> {
     use std::io::Read;
     let mut head = [0u8; 4];
-    let mut file = fs::File::open(path).ok()?;
     let mut got = 0;
     while got < head.len() {
         match file.read(head.get_mut(got..)?) {
@@ -1133,6 +1189,7 @@ fn first_bytes(path: &Path) -> Option<[u8; 4]> {
 /// made since.
 pub fn known_hashes(
     walk: &Walk,
+    sizes: Option<&Sizes>,
     ind: &Indicators,
     v: &mut Verdict,
     sink: &mut Sink,
@@ -1144,11 +1201,25 @@ pub fn known_hashes(
         v.push(Finding::ok("no known hashes to compare"));
         return;
     }
-    let large: Vec<&PathBuf> = walk
-        .files
-        .iter()
-        .filter(|path| fs::metadata(path).is_ok_and(|m| SWEEP.contains(&m.len())))
-        .collect();
+    let in_range = |path: &&PathBuf| fs::metadata(path).is_ok_and(|m| SWEEP.contains(&m.len()));
+    // The pass over the project files has the size of every file it opened;
+    // only the rest are asked for here.
+    let large: Vec<&PathBuf> = match sizes {
+        Some(sizes) => {
+            let mut at: Vec<usize> = sizes.sweep.clone();
+            at.extend(
+                sizes
+                    .unknown
+                    .iter()
+                    .copied()
+                    .filter(|n| walk.files.get(*n).as_ref().is_some_and(in_range)),
+            );
+            at.sort_unstable();
+            at.dedup();
+            at.iter().filter_map(|n| walk.files.get(*n)).collect()
+        }
+        None => walk.files.iter().filter(in_range).collect(),
+    };
     let programs: Vec<&PathBuf> = large
         .iter()
         .copied()
@@ -1993,6 +2064,7 @@ mod tests {
                 on_infected: OnInfectedConfig::Strip,
                 configs_stripped: false,
                 resume: None,
+                sizes: None,
             },
             &ind,
             &mut v,
@@ -2028,6 +2100,147 @@ mod tests {
     }
 
     #[test]
+    fn step_3_hashes_the_same_files_from_the_sizes_the_pass_kept() {
+        // The pass opens each file once and keeps the sizes step 3 needs;
+        // step 3 asks only for the files the pass never opened. The files
+        // hashed must be exactly those a stat of every file would pick.
+        let dir = scratch("sizes");
+        let root = dir.join("tree");
+        let program = |path: &Path, len: usize| {
+            let mut bytes = b"\x7fELF".to_vec();
+            bytes.resize(len, 7);
+            fs::create_dir_all(path.parent().expect("parent")).expect("dir");
+            fs::write(path, &bytes).expect("write");
+        };
+        let mb = 1024 * 1024;
+        let under = root.join("a/under.bin");
+        let edge = root.join("a/edge.bin");
+        let over = root.join("a/over.bin");
+        let editor = root.join(".vscode/tool.bin");
+        let tooling = root.join("polinrider-scan.sh");
+        program(&under, 10 * mb - 1);
+        program(&edge, 10 * mb);
+        program(&over, 11 * mb);
+        program(&editor, 11 * mb);
+        program(&tooling, 11 * mb);
+        let mut files = vec![
+            under,
+            edge.clone(),
+            over.clone(),
+            editor.clone(),
+            tooling.clone(),
+        ];
+        files.sort();
+        let walk = Walk {
+            files,
+            ..Walk::default()
+        };
+        let ind = Indicators {
+            weak: vec!["WEAK-SIGNAL".into()],
+            hashes: vec![("0".repeat(64), "never".into())],
+            ..Indicators::default()
+        };
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let sizes = std::cell::RefCell::new(Sizes::default());
+        project_files(
+            &walk,
+            &ProjectFiles {
+                roots: std::slice::from_ref(&root),
+                on_infected: OnInfectedConfig::Report,
+                configs_stripped: false,
+                resume: None,
+                sizes: Some(&sizes),
+            },
+            &ind,
+            &mut Verdict::new(),
+            &mut Sink::Dry(&q),
+            &mut |_| {},
+        );
+        // The editor file and the tooling are never opened by the pass.
+        assert_eq!(sizes.borrow().unknown.len(), 2, "{:?}", sizes.borrow());
+        let hashed = |sizes: Option<&Sizes>| {
+            let mut v = Verdict::new();
+            let mut asked = Vec::new();
+            known_hashes(
+                &walk,
+                sizes,
+                &ind,
+                &mut v,
+                &mut Sink::Dry(&q),
+                &mut |n, of, _| {
+                    asked.push((n, of));
+                },
+            );
+            let notes: Vec<String> = v
+                .entries()
+                .iter()
+                .filter_map(|e| match e {
+                    crate::verdict::Entry::Note(n) => Some(n.clone()),
+                    _ => None,
+                })
+                .collect();
+            (asked, notes)
+        };
+        let (asked, notes) = hashed(Some(&sizes.borrow()));
+        assert_eq!((asked.clone(), notes.clone()), hashed(None));
+        assert_eq!(asked.last().map(|(_, of)| *of), Some(4), "{asked:?}");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_binary_file_is_read_no_further_than_its_first_8_kb() {
+        // Read in two parts now, with the same answers as reading it whole:
+        // a NUL byte in the first 8 KB means binary, and a text file is read
+        // to its end.
+        let dir = scratch("first-8k");
+        let root = dir.join("tree");
+        fs::create_dir_all(&root).expect("dir");
+        let binary = root.join("image.png");
+        let mut bytes = vec![b'a'; 100];
+        bytes.push(0);
+        bytes.resize(20_000, b'a');
+        bytes.extend_from_slice(b"WEAK-SIGNAL");
+        fs::write(&binary, &bytes).expect("write");
+        let text = root.join("notes.txt");
+        let mut long = "x".repeat(900 * 1024);
+        long.push_str("WEAK-SIGNAL\n");
+        fs::write(&text, long).expect("write");
+        let walk = Walk {
+            files: vec![binary, text.clone()],
+            ..Walk::default()
+        };
+        let ind = Indicators {
+            weak: vec!["WEAK-SIGNAL".into()],
+            ..Indicators::default()
+        };
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let mut v = Verdict::new();
+        project_files(
+            &walk,
+            &ProjectFiles {
+                roots: std::slice::from_ref(&root),
+                on_infected: OnInfectedConfig::Report,
+                configs_stripped: false,
+                resume: None,
+                sizes: None,
+            },
+            &ind,
+            &mut v,
+            &mut Sink::Dry(&q),
+            &mut |_| {},
+        );
+        let reviewed: Vec<&Path> = v
+            .findings()
+            .filter(|f| f.level == crate::verdict::Level::Review)
+            .filter_map(|f| f.path.as_deref())
+            .collect();
+        assert_eq!(reviewed, vec![text.as_path()]);
+        let mut file = fs::File::open(&walk.files[0]).expect("open");
+        assert_eq!(read_text(&mut file), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn the_pass_saves_its_place_and_a_continued_one_skips_what_was_read() {
         // Paths only: a file that cannot be read is passed over, so the
         // positions and the save points are all this tests.
@@ -2052,6 +2265,7 @@ mod tests {
                     on_infected: OnInfectedConfig::Report,
                     configs_stripped: false,
                     resume,
+                    sizes: None,
                 },
                 &ind,
                 &mut v,
@@ -2145,9 +2359,16 @@ mod tests {
         let q = Quarantine::<DryRun>::new(dir.join("q"));
         let mut v = Verdict::new();
         let mut asked: Vec<(usize, usize)> = Vec::new();
-        known_hashes(&walk, &ind, &mut v, &mut Sink::Dry(&q), &mut |n, of, _| {
-            asked.push((n, of));
-        });
+        known_hashes(
+            &walk,
+            None,
+            &ind,
+            &mut v,
+            &mut Sink::Dry(&q),
+            &mut |n, of, _| {
+                asked.push((n, of));
+            },
+        );
         assert_eq!(
             asked,
             vec![(0, 1), (1, 1)],

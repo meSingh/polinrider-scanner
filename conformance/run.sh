@@ -339,7 +339,9 @@ run_case() {
   while IFS=$'\t' read -r big_path big_head big_mb big_fill; do
     [[ -z "$big_path" ]] && continue
     mkdir -p "$tmp/tree/$(dirname "$big_path")"
-    printf '%b' "$big_head" > "$tmp/tree/$big_path"
+    # The placeholders work in the first bytes too: a binary can carry a
+    # weak string after its first NUL byte.
+    printf '%b' "$(subst "$big_head")" > "$tmp/tree/$big_path"
     if [[ -n "$big_fill" ]]; then
       head -c $((big_mb * 1048576)) /dev/zero | tr '\0' "$big_fill" >> "$tmp/tree/$big_path"
     else

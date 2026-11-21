@@ -310,6 +310,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     checks::named_files(&w, ind, v, sink);
     checks::packages(&w, ind, v);
     s.flush(v);
+    let sizes = std::cell::RefCell::new(checks::Sizes::default());
     let skipped = checks::project_files(
         &w,
         &checks::ProjectFiles {
@@ -317,6 +318,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
             on_infected: scope.on_infected_config,
             configs_stripped,
             resume: scope.resume,
+            sizes: Some(&sizes),
         },
         ind,
         v,
@@ -337,9 +339,16 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
 
     // --- step 3: large files against the known hashes -------------------------
     s.start(3);
-    checks::known_hashes(&w, ind, v, sink, &mut |n, of, fresh| {
-        s.count(n, Some(of), fresh);
-    });
+    checks::known_hashes(
+        &w,
+        Some(&sizes.borrow()),
+        ind,
+        v,
+        sink,
+        &mut |n, of, fresh| {
+            s.count(n, Some(of), fresh);
+        },
+    );
     s.flush(v);
     s.done(v);
 }
