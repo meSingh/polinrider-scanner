@@ -30,7 +30,7 @@ $process_person_profile false: no person profile is made.
 
 Environment: POSTHOG_PROJECT_KEY, the project's key (phc_...). With none,
 `send` and `backfill` say so and exit 0 without writing a ledger.
-POSTHOG_HOST overrides the EU cloud's address, for testing.
+POSTHOG_HOST overrides the US cloud's address, for testing.
 
 Standard library only: the runner's Python, nothing installed.
 """
@@ -53,7 +53,7 @@ import uuid
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import downloads  # noqa: E402
 
-HOST = "https://eu.i.posthog.com"
+HOST = "https://us.i.posthog.com"
 DISTINCT_ID = "polinrider-traffic-log"
 REPO = "meSingh/polinrider-scanner"
 OWNER = "meSingh"

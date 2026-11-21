@@ -29,7 +29,7 @@ export const SITE_DESCRIPTION =
 export const REPO_URL = 'https://github.com/meSingh/polinrider-scanner';
 export const EDIT_URL = `${REPO_URL}/edit/main/docs-site/`;
 
-// PostHog web analytics, on PostHog's EU cloud (ADR-0066). Nothing is
+// PostHog web analytics, on PostHog's US cloud (ADR-0066, ADR-0067). Nothing is
 // injected until the build's environment holds the project's key in
 // PUBLIC_POSTHOG_KEY, set as a repository variable and passed in by
 // .github/workflows/docs.yml. The key is public: PostHog calls it a project
@@ -40,7 +40,7 @@ export const EDIT_URL = `${REPO_URL}/edit/main/docs-site/`;
 // stored on the visitor's device, no person profiles, page views, page
 // leaves and two named clicks, nothing else.
 export const POSTHOG_KEY = (process.env.PUBLIC_POSTHOG_KEY ?? '').trim();
-export const POSTHOG_HOST = 'https://eu.i.posthog.com';
+export const POSTHOG_HOST = 'https://us.i.posthog.com';
 
 if (POSTHOG_KEY && !/^phc_[A-Za-z0-9]{20,64}$/.test(POSTHOG_KEY)) {
   throw new Error(

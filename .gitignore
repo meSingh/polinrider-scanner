@@ -97,3 +97,7 @@ docs-site/book/
 
 # Temporary git worktrees Claude Code creates for background agents.
 .claude/worktrees/
+
+# Python bytecode, from running the workflow scripts and their tests
+__pycache__/
+*.pyc
