@@ -1,0 +1,16 @@
+---
+// PostHog web analytics' settings, in the <head> of every page while it is
+// switched on (siteConfig.mjs, ANALYTICS_ON). The key and host travel to the
+// script as data; the script itself, src/scripts/analytics.ts, is added to
+// every page by the integration in astro.config.mjs under the same switch.
+// Base.astro renders this only when analytics is on, so a build without a
+// key carries neither the tag nor the script.
+import { POSTHOG_HOST, POSTHOG_KEY } from '../siteConfig.mjs';
+---
+
+<script
+  is:inline
+  type="application/json"
+  id="posthog-config"
+  set:html={JSON.stringify({ key: POSTHOG_KEY, host: POSTHOG_HOST })}
+/>

@@ -69,7 +69,7 @@ If you disagree with one, open an issue and quote its number.
 | [0051](./0051-the-github-check-compares-known-hashes.md) | The GitHub check compares the small files against the known hashes | Accepted |
 | [0052](./0052-content-patterns-at-the-confirmed-tier.md) | Match campaign patterns in file contents | Accepted; its rule that a pattern match is not stripped is superseded by [ADR-0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) |
 | [0053](./0053-release-downloads-are-counted-daily-with-our-own-kept-apart.md) | Count release downloads daily, with our own kept apart | Accepted |
-| [0055](./0055-the-documentation-site-is-plain-astro.md) | Build the documentation site with plain Astro, not Starlight | Accepted |
+| [0055](./0055-the-documentation-site-is-plain-astro.md) | Build the documentation site with plain Astro, not Starlight | Accepted; its analytics choice is superseded by [ADR-0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) |
 | [0056](./0056-the-docs-are-versioned-by-release-line.md) | Keep a frozen copy of the docs for each release line | Accepted |
 | [0057](./0057-the-repository-is-polinrider-scanner-from-3-0-0.md) | Rename the repository and its packages to polinrider-scanner, from 3.0.0 | Accepted |
 | [0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) | Confirm the var z and global.i tags, and read every JavaScript file | Accepted |
@@ -79,6 +79,7 @@ If you disagree with one, open an issue and quote its number.
 | [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
 | [0064](./0064-editor-and-app-startup-files-are-read-at-their-install-paths.md) | Editor and app startup files are read at their install paths | Accepted |
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
+| [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted |
 
 ## Adding one
 

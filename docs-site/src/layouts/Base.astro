@@ -1,7 +1,7 @@
 ---
 // Every page: the <head> (title, description, canonical address, social
 // card, theme colours, Updates feed, search engine verification and, once
-// switched on, Cloudflare Web Analytics), the top bar, the page and the
+// switched on, PostHog web analytics), the top bar, the page and the
 // footer.
 import '../styles/theme.css';
 import '../styles/base.css';
@@ -9,13 +9,13 @@ import '../styles/prose.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ThemeScript from '../components/ThemeScript.astro';
+import Analytics from '../components/Analytics.astro';
 import geist from '../assets/fonts/geist-variable.woff2?url';
 import { jsonLd, person, website } from '../schema';
 import {
   BING_SITE_VERIFICATION,
   GOOGLE_SITE_VERIFICATION,
   ANALYTICS_ON,
-  CF_WEB_ANALYTICS_TOKEN,
   SHORT_TITLE,
   SITE_DESCRIPTION,
   SITE_ORIGIN,
@@ -108,14 +108,7 @@ const fullTitle = titleTag ?? (branded.length <= 60 ? branded : title);
 
     {GOOGLE_SITE_VERIFICATION && <meta name="google-site-verification" content={GOOGLE_SITE_VERIFICATION} />}
     {BING_SITE_VERIFICATION && <meta name="msvalidate.01" content={BING_SITE_VERIFICATION} />}
-    {ANALYTICS_ON && (
-      <script
-        is:inline
-        type="module"
-        src="https://static.cloudflareinsights.com/beacon.min.js"
-        data-cf-beacon={JSON.stringify({ token: CF_WEB_ANALYTICS_TOKEN })}
-      />
-    )}
+    {ANALYTICS_ON && <Analytics />}
     <ThemeScript />
     {graph.length > 0 && <script type="application/ld+json" is:inline set:html={jsonLd(graph)} />}
     <slot name="head" />

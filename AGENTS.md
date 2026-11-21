@@ -366,7 +366,8 @@ descending. That was the six-hour scan ([ADR-0025](./docs/adr/0025-walk-the-file
 | Old site links | `meSingh/meSingh.github.io` | Redirect pages for `mesingh.github.io/polinrider-cleaner/...`, the site's address before 3.0.0. Keep it while old links get traffic |
 | DNS for both domains | Cloudflare | `polinriderscanner.com`: GitHub Pages records, DNS only, plus the TXT records that verify it to GitHub, Google and Bing. `polinrider.com`: a proxied placeholder (`AAAA 100::`) and a Single Redirect rule, a 301 from every path on the apex and `www` to `https://polinriderscanner.com/what-is-polinrider/` |
 | The old name | `meSingh/polinrider-cleaner` | The repository's name until 3.0.0; GitHub redirects it here. **Never create a repository with that name.** Doing so ends every redirect, including the links in releases before 3.0.0 and in the commits, pull requests and issues the tool has opened on other people's repositories (ADR-0057) |
-| Traffic log | `traffic` branch, from `.github/workflows/traffic.yml` | Views, clones, referrers, paths and stars, daily, kept past GitHub's 14 days. Needs the `TRAFFIC_TOKEN` secret: a fine-grained token on this repository with Administration: read only. Release downloads per week, with our own taken off, under `downloads/` on the same branch; that part needs only the workflow token. See "The download history" below |
+| Traffic log | `traffic` branch, from `.github/workflows/traffic.yml` | Views, clones, referrers, paths and stars, daily, kept past GitHub's 14 days. Needs the `TRAFFIC_TOKEN` secret: a fine-grained token with Administration: read on this repository, and on the tap, the bucket and the action to record theirs under `repos/`; it also counts the action's users by code search. Release downloads per week, with our own taken off, under `downloads/` on the same branch; that part needs only the workflow token. See "The download history" and "Usage numbers in PostHog" below |
+| Usage numbers | PostHog, EU cloud, one project | The site's page views and clicks, and a copy of the traffic log's numbers. The site's key is the `PUBLIC_POSTHOG_KEY` repository variable, the traffic log's the `POSTHOG_PROJECT_KEY` secret: the same project key. Cookieless tracking must be on in the project. See "Usage numbers in PostHog" below |
 
 ### Cutting a release
 
@@ -600,6 +601,55 @@ Our counted downloads from before the log began, three `curl` test downloads
 on 2026-11-04, are in `.github/scripts/downloads-ours-start.csv`, which seeds
 `ours.csv` on the first run and is not read again. The earlier release checks
 and the winget manifest check used `gh release download` and are not in it.
+
+### Usage numbers in PostHog
+
+The site's visits and GitHub's numbers are read in one PostHog project, on
+its EU cloud (ADR-0066). The `traffic` branch stays the permanent record:
+PostHog holds a copy, and can be replaced or emptied without losing
+anything GitHub reported.
+
+**The site.** `docs-site/src/scripts/analytics.ts` says what it sends and
+what it does not. It is on only when the build has `PUBLIC_POSTHOG_KEY`
+(the repository variable, passed in by `docs.yml`) and builds the real site;
+without it no page carries any PostHog code, and a value that is not a
+PostHog project key (`phc_...`) fails the build. It runs cookieless, so the
+project's **Settings, Web analytics, Cookieless tracking** must be on, or
+PostHog discards every event from the site and says so only as an ingestion
+warning. Do not turn on autocapture, session recording, surveys or person
+profiles: the footer and the About page say they are off. Anything new the
+site should count is a named event in `analytics.ts`, and a change to what
+is collected changes that wording too.
+
+**GitHub's numbers.** The Traffic log's last step runs
+`.github/scripts/posthog.py`, which reads the branch and sends one event per
+day per thing: `github_views` and `github_clones` per repository,
+`github_stars`, `github_top_referrer` and `github_top_path` (GitHub's 14-day
+totals as read that day: never sum them across days), `github_downloads`
+per release and platform, `github_checksum_downloads` per release and file,
+`github_downloads_before_log` and `github_action_users`. Every event has
+the distinct_id `polinrider-traffic-log` and no person profile. Its uuid is
+made from what it counts, so sending it again replaces it;
+`posthog/sent.csv` on the branch records what was sent, and each run sends
+only what is new or changed. Without the `POSTHOG_PROJECT_KEY` secret the
+step prints a notice and passes.
+
+To send everything again, into a new project or after a change to how
+events are built:
+
+```bash
+gh workflow run traffic.yml --repo meSingh/polinrider-scanner -f posthog_backfill=true
+```
+
+It is safe to repeat. **Never change `NAMESPACE` in `posthog.py`, or the
+names or keys an event's uuid is made from**: every event would get a new
+uuid and PostHog would count it twice. To change what an existing event
+carries, change its properties; the ledger resends the events whose content
+changed, and PostHog replaces them.
+
+Test the script with
+`python3 -m unittest discover -s .github/scripts -p 'test_*.py'` (CI runs
+it); `test_posthog.py` says how to run it against the whole branch.
 
 ### Signing
 

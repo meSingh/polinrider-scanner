@@ -18,6 +18,20 @@
 # and runs whether or not TRAFFIC_TOKEN is set. To record downloads of ours,
 # run this workflow by hand with the own_* inputs (AGENTS.md, "Traffic log").
 #
+# The same token reads the views and clones of the Homebrew tap, the Scoop
+# bucket and the GitHub action, under repos/ on the branch, when it has
+# Administration: read on each (each one it cannot read is skipped with a
+# notice), and counts the public repositories whose workflows use the action,
+# by code search, into action-users.csv.
+#
+# Last, it sends a copy of the numbers to PostHog, one event per day per
+# thing, where they sit beside the website's (.github/scripts/posthog.py,
+# ADR-0066). The branch stays the permanent record. Without the
+# POSTHOG_PROJECT_KEY secret that step says so and passes. posthog/sent.csv
+# on the branch records what was sent, so each event goes once, and again
+# only when GitHub revises its numbers. To send the whole history again, run
+# this workflow by hand with posthog_backfill.
+#
 # Writes go through the contents and git data APIs with the workflow token, so
 # every commit on `traffic` is made and signed by GitHub. No third-party action
 # is used.
@@ -50,6 +64,11 @@ on:
         description: 'Who downloaded and why, such as "release check" or "test machine"'
         required: false
         type: string
+      posthog_backfill:
+        description: 'Send the whole history to PostHog again, not only what is new (safe to repeat)'
+        required: false
+        default: false
+        type: boolean
 
 permissions: read-all
 
@@ -154,6 +173,50 @@ jobs:
           cat "$RUNNER_TEMP/line.csv" >> "$RUNNER_TEMP/kept.csv"
           store "stars.csv" "$RUNNER_TEMP/kept.csv" "Record stars for $today"
 
+          # The tap, the bucket and the action: views and clones, merged by
+          # day as above, under repos/<name>/. GitHub shows a repository's
+          # traffic only to a token that can administer it, so each one
+          # TRAFFIC_TOKEN does not cover is skipped with a notice.
+          owner=${REPO%%/*}
+          for name in homebrew-tap scoop-bucket polinrider-action; do
+            if ! read_api "repos/$owner/$name/traffic/views?per=day" > "$RUNNER_TEMP/views.json" 2>/dev/null; then
+              echo "::notice::TRAFFIC_TOKEN cannot read the traffic of $owner/$name, so it is not recorded. Give the token Administration: read on that repository."
+              continue
+            fi
+            read_api "repos/$owner/$name/traffic/clones?per=day" > "$RUNNER_TEMP/clones.json"
+            for kind in views clones; do
+              fetch "repos/$name/$kind.json" '[]' > "$RUNNER_TEMP/old.json"
+              jq -s --arg k "$kind" '
+                (.[0] + .[1][$k])
+                | group_by(.timestamp) | map(.[-1]) | sort_by(.timestamp)
+              ' "$RUNNER_TEMP/old.json" "$RUNNER_TEMP/$kind.json" > "$RUNNER_TEMP/merged.json"
+              store "repos/$name/$kind.json" "$RUNNER_TEMP/merged.json" "Record $name $kind to $today"
+            done
+          done
+
+          # Public repositories whose workflows use the action, one line a
+          # day: how many repositories and how many workflow files, the
+          # owner's own left out. Code search needs a user's token, hence
+          # TRAFFIC_TOKEN, and finds only what GitHub has indexed, so this
+          # is a floor, not a census.
+          query="\"$owner/polinrider-action\" path:.github/workflows"
+          if read_api -X GET search/code -f q="$query" -f per_page=100 --paginate --slurp \
+               > "$RUNNER_TEMP/search.json" 2>/dev/null; then
+            jq -r --arg d "$today" --arg o "$owner" '
+              [.[].items[] | select(.repository.owner.login != $o)]
+              | [$d, (map(.repository.full_name) | unique | length), length] | @csv
+            ' "$RUNNER_TEMP/search.json" > "$RUNNER_TEMP/line.csv"
+            fetch "action-users.csv" '' > "$RUNNER_TEMP/users.csv"
+            if [ ! -s "$RUNNER_TEMP/users.csv" ]; then
+              echo '"date","repositories","files"' > "$RUNNER_TEMP/users.csv"
+            fi
+            grep -v "^\"$today\"," "$RUNNER_TEMP/users.csv" > "$RUNNER_TEMP/kept.csv" || true
+            cat "$RUNNER_TEMP/line.csv" >> "$RUNNER_TEMP/kept.csv"
+            store "action-users.csv" "$RUNNER_TEMP/kept.csv" "Record action users for $today"
+          else
+            echo "::notice::Code search failed with TRAFFIC_TOKEN, so the action's users are not counted today."
+          fi
+
           echo "Recorded traffic for $today on the $BRANCH branch."
 
       # Only the script, from main, and no credentials left behind: the steps
@@ -237,3 +300,46 @@ jobs:
             echo "Recorded downloads for $today on the $BRANCH branch."
           fi
           cat "$work/new/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # A copy of the numbers to PostHog (.github/scripts/posthog.py,
+      # ADR-0066), read from the branch as the steps above left it. Runs
+      # whether or not those steps recorded anything new. The ledger,
+      # posthog/sent.csv on the branch, is committed even after a partial
+      # send, so what went is not sent again; the step still fails then.
+      - name: Send to PostHog
+        if: ${{ !cancelled() && steps.script.outcome == 'success' }}
+        env:
+          POSTHOG_PROJECT_KEY: ${{ secrets.POSTHOG_PROJECT_KEY }}
+          BACKFILL: ${{ inputs.posthog_backfill }}
+        run: |
+          set -euo pipefail
+          if [ -z "$POSTHOG_PROJECT_KEY" ]; then
+            echo "::notice::POSTHOG_PROJECT_KEY is not set, so nothing is sent to PostHog. The $BRANCH branch is written as before."
+            exit 0
+          fi
+          api() { GH_TOKEN="$WRITE_TOKEN" gh api "$@"; }
+          work="$RUNNER_TEMP/posthog"
+          mkdir -p "$work/data"
+
+          head=$(api "repos/$REPO/git/ref/heads/$BRANCH" --jq .object.sha)
+          api "repos/$REPO/tarball/$head" | tar -xz --strip-components=1 -C "$work/data"
+
+          command=send
+          if [ "$BACKFILL" = true ]; then
+            command=backfill
+          fi
+          status=0
+          python3 -I .github/scripts/posthog.py "$command" "$work/data" "$work/sent.csv" || status=$?
+
+          if [ -f "$work/sent.csv" ] && ! cmp -s "$work/sent.csv" "$work/data/posthog/sent.csv"; then
+            base=$(api "repos/$REPO/git/commits/$head" --jq .tree.sha)
+            tree=$(jq -n --arg b "$base" --rawfile c "$work/sent.csv" \
+              '{base_tree: $b, tree: [{path: "posthog/sent.csv", mode: "100644", type: "blob", content: $c}]}' |
+              api -X POST "repos/$REPO/git/trees" --input - --jq .sha)
+            commit=$(jq -n --arg m "Record what was sent to PostHog to $(date -u +%F)" --arg t "$tree" --arg p "$head" \
+              '{message: $m, tree: $t, parents: [$p]}' |
+              api -X POST "repos/$REPO/git/commits" --input - --jq .sha)
+            jq -n --arg s "$commit" '{sha: $s}' |
+              api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH" --input - >/dev/null
+          fi
+          exit "$status"

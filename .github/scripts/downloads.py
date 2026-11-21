@@ -152,6 +152,39 @@ def load_releases(path):
     return [r for r in releases if not r.get("draft")]
 
 
+def daily_changes(counts, today):
+    """Downloads per file per day, from the running totals in counts.csv.
+
+    Returns the log's first day and a list of (day, tag, file, downloads).
+    A total taken on day D counts downloads since the run before, mostly made
+    on D-1, so the change is put on D-1. Everything in the first totals has
+    no date: its day is None. Also read by posthog.py, so the weekly tables
+    and the daily events count alike.
+    """
+    first_day = parse_day(counts[0]["date"], "date") if counts else today
+    last = {}
+    changes = []
+    for r in counts:
+        key = (r["tag"], r["file"])
+        day = parse_day(r["date"], "date")
+        total = int(r["total"])
+        if day == first_day:
+            change, when = total, None
+        elif key in last:
+            # A total below the last one means the file was replaced, and
+            # the count started again from nothing.
+            change = total - last[key] if total >= last[key] else total
+            when = day - dt.timedelta(days=1)
+        else:
+            # A file first seen after the log began was published since the
+            # run before, so all of its downloads are new.
+            change, when = total, day - dt.timedelta(days=1)
+        last[key] = total
+        if change:
+            changes.append((when, r["tag"], r["file"], change))
+    return first_day, changes
+
+
 def record_ours(releases, ours, today, tag, files, count, day, note):
     release = next((r for r in releases if r["tag_name"] == tag), None)
     if release is None:
@@ -235,31 +268,11 @@ def main():
     counts.sort(key=lambda r: (r["date"], r["tag"], r["file"]))
     ours.sort(key=lambda r: (r["date"], r["tag"], r["file"]))
 
-    # Downloads per file per week. A total taken on day D counts downloads
-    # since the run before, mostly made on D-1, so the change is put on D-1.
-    # Everything in the first totals has no date: it goes in "before".
-    first_day = parse_day(counts[0]["date"], "date") if counts else today
+    # Downloads per file per week, from the day-by-day changes.
+    first_day, changes = daily_changes(counts, today)
     before = f"before {first_day.isoformat()}"
-    last = {}
-    rows = []  # (bucket, tag, file, downloads)
-    for r in counts:
-        key = (r["tag"], r["file"])
-        day = parse_day(r["date"], "date")
-        total = int(r["total"])
-        if day == first_day:
-            change, bucket = total, before
-        elif key in last:
-            # A total below the last one means the file was replaced, and
-            # the count started again from nothing.
-            change = total - last[key] if total >= last[key] else total
-            bucket = week_of(day - dt.timedelta(days=1)).isoformat()
-        else:
-            # A file first seen after the log began was published since the
-            # run before, so all of its downloads are new.
-            change, bucket = total, week_of(day - dt.timedelta(days=1)).isoformat()
-        last[key] = total
-        if change:
-            rows.append((bucket, r["tag"], r["file"], change))
+    rows = [(before if day is None else week_of(day).isoformat(), tag, name, n)
+            for day, tag, name, n in changes]  # (bucket, tag, file, downloads)
 
     # One of our downloads on day X is in the first totals when X is before
     # the first run's day, and otherwise in the week holding X.

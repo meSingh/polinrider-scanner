@@ -67,8 +67,15 @@ jobs:
       - name: Build
         # The token only reads workflow runs for the live badges
         # (docs-site/src/badges.ts), and lifts the anonymous rate limit.
+        #
+        # PUBLIC_POSTHOG_KEY is the PostHog project's key, a repository
+        # variable (not a secret: it is public, in every page that counts).
+        # Empty or unset, the site carries no analytics; a value that is not
+        # a PostHog project key fails the build (src/siteConfig.mjs,
+        # ADR-0066).
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PUBLIC_POSTHOG_KEY: ${{ vars.PUBLIC_POSTHOG_KEY }}
         run: npm run build --prefix docs-site
 
       - name: Upload the site
