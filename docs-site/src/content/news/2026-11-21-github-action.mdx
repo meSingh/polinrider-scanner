@@ -1,0 +1,99 @@
+---
+title: A GitHub action that stops PolinRider coming back
+description: "The PolinRider Scanner action checks every push and pull request with the same binary as the laptop tool, pinned by hash. Its fixes are pull requests."
+category: announcements
+date: "2026-11-21"
+sidebar:
+  label: "The GitHub action"
+---
+
+Getting PolinRider out of a repository is half the work. Keeping it out is
+the other half, and until now that meant copying our scanner into every
+repository by hand. From today there is a GitHub action:
+[PolinRider Scanner on the GitHub Marketplace](https://github.com/marketplace/actions/polinrider-scanner),
+free and MIT-licensed. It checks every push, every pull request and once a
+week, and fails the check when it finds the payload.
+
+## Why it exists
+
+The payload spreads through computers. An infected laptop with a valid token
+amends the latest commit and force-pushes it, so the history looks clean.
+Clean the repository and miss one of those laptops, and the payload is back
+on the next commit, sometimes within minutes.
+
+A required check does not stop the push. It makes sure you find out at once,
+and that the infected change cannot merge into your default branch. Without
+one, the usual way people find out is a stranger opening an issue weeks
+later.
+
+## What is different about it
+
+There was already an action on the Marketplace under the campaign's name.
+We built our own because of how a scan step like this should behave.
+
+It runs the same program you run on a laptop. The action downloads the
+released polinrider binary with its indicators and runs it on your checkout,
+so CI gives the verdict you would get at your desk. There is no separate
+signature list to fall behind.
+
+It is pinned by hash. The polinrider version and the SHA-256 of each archive
+are written into the action. It refuses to unpack an archive that does not
+match. You pin the action itself by its full commit SHA, its release tags
+are protected so they never move, and Dependabot offers each new release as a
+pull request you review.
+
+Its fixes are pull requests. In fix mode it removes the payload on the
+runner and opens a pull request with the result. It never commits to the
+branch it scanned, never force-pushes and never merges. The pull request
+lists what it cut out and what it left for a person to look at, and reminds
+you to check the computers first. On a pull request from a fork it changes
+nothing.
+
+Check mode, the default, needs only read access, and the step that runs
+polinrider never sees a token.
+
+## How to start
+
+Add one workflow file, `.github/workflows/polinrider.yml`:
+
+```yaml
+name: PolinRider
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: meSingh/polinrider-action@8c71848593f0e58416c5f61845b3bd2e8080d438 # v1.0.0
+```
+
+Then make the `scan` check required on your default branch and add
+Dependabot for the pin. [Set up the action](/docs/action/setup/) walks
+through both. The [action's page](/github-action/) has the rest.
+
+## What it does not do
+
+It scans what is checked out: one branch, at one commit. It does not read
+your history or your other branches; the laptop tool's GitHub check does
+that, and it is the right first step after an incident. Windows runners are
+not supported yet, and the Linux runners need `ubuntu-24.04` or later.
+
+It also does not clean your computers. If you are in the middle of a cleanup,
+start with [the cleanup checklist](/docs/guides/getting-rid-of-polinrider/):
+machines first, then credentials, then repositories, then this.
+
+## Sources
+
+- GitHub Marketplace, [PolinRider Scanner](https://github.com/marketplace/actions/polinrider-scanner)
+- [meSingh/polinrider-action](https://github.com/meSingh/polinrider-action), v1.0.0
+- [ADR-0062][adr-0062], why the action runs the released binary pinned by hash
+
+[adr-0062]: https://github.com/meSingh/polinrider-scanner/blob/main/docs/adr/0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md
