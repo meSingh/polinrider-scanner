@@ -36,7 +36,7 @@ export const NO_REF = [
   'github.io',
   'scorecard.dev', // the OpenSSF Scorecard badge and viewer
   'msingh.com', // the author
-  'cloudflare.com', // the footer's analytics credit
+  'posthog.com', // the footer's analytics credit
   'linkedin.com', // profile links on About
   'twitter.com',
   'registry.npmjs.org', // package registries, linked as places to check a name

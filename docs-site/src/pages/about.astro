@@ -73,7 +73,12 @@ const schema = [
 
       <h2 id="this-site">This site</h2>
       <p>
-        No cookies and no trackers.{ANALYTICS_ON && ' Page visits are counted anonymously by Cloudflare Web Analytics.'}
+        {ANALYTICS_ON
+          ? 'No cookies, nothing stored on your device and no profile of you. PostHog, on its EU servers, counts ' +
+            'page visits, how long a page stays open and clicks on the download and GitHub links. It uses your IP ' +
+            'address and browser only to tell visitors apart within a day, and does not keep them. A browser that ' +
+            'sends Do Not Track is not counted.'
+          : 'No cookies and no trackers.'}{' '}
         Every page shows when it last changed, and links to its source on GitHub so a correction can be proposed.
       </p>
 

@@ -1,7 +1,7 @@
 ---
 // Below every page: the brand and what the project is, a column of links for
 // each section, the project's own links and a row of trust badges. The
-// analytics line appears only while Cloudflare Web Analytics is switched on,
+// analytics line appears only while PostHog web analytics is switched on,
 // so the footer never claims analytics the page does not load, and never
 // hides analytics it does.
 import Badges from './Badges.astro';
@@ -98,8 +98,8 @@ import BrandMark from './BrandMark.astro';
       <Badges size="md" />
       {ANALYTICS_ON && (
         <p class="privacy">
-          No cookies and no trackers. Anonymous page counts through{' '}
-          <a href="https://www.cloudflare.com/web-analytics/">Cloudflare Web Analytics</a>.
+          No cookies and nothing stored on your device. Anonymous page counts through{' '}
+          <a href="https://posthog.com/">PostHog</a>, on its EU servers.
         </p>
       )}
     </div>
