@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0071](./0071-fresh-is-accepted-with-apply.md) |
 | **Date** | 2026-11-15 |
 
 ## Context

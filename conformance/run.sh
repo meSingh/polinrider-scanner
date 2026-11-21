@@ -315,6 +315,8 @@ run_case() {
   KILL_WHEN="$(jq -r '.kill.when // empty' "$cf")"
   KILL_IN="$(jq -r '.kill.in // "report"' "$cf")"
   EXTRA_ARGS=()
+  # Flags of the case's own for its first run, as then.args are for a second.
+  while IFS= read -r ed; do EXTRA_ARGS+=("$ed"); done < <(jq -r '.args[]? // empty' "$cf")
 
   # build the fixture: the tree to scan, the home directory, and for a host
   # case the machine's state

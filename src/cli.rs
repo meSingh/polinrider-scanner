@@ -481,10 +481,13 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
             why: "one continues an earlier check and the other starts again".into(),
         });
     }
-    if apply && (resume || fresh) {
+    // --fresh asks for what --apply always does, so it is accepted and does
+    // nothing more (ADR-0071). --resume would continue a run, and one that
+    // moves files is never continued.
+    if apply && resume {
         return Err(Rejection::Conflict {
             first: "--apply".into(),
-            second: if resume { "--resume" } else { "--fresh" }.into(),
+            second: "--resume".into(),
             why: "a check that moves files is never continued, it always starts from the beginning"
                 .into(),
         });
@@ -673,6 +676,14 @@ mod tests {
         );
         let a = parse(args(&["check", "--fresh", "/tmp"]).into_iter(), ioc.clone()).expect("ok");
         assert!(a.fresh && !a.resume);
+        // A check that moves files always starts from the beginning, so
+        // --fresh beside --apply asks for nothing more and is accepted.
+        let a = parse(
+            args(&["--apply", "--fresh", "/tmp"]).into_iter(),
+            ioc.clone(),
+        )
+        .expect("accepted");
+        assert!(a.apply && a.fresh && !a.resume);
         for argv in [
             vec!["clean", "--resume", "/tmp"],
             vec!["clean", "--fresh", "/tmp"],
@@ -687,11 +698,19 @@ mod tests {
         for argv in [
             vec!["--resume", "--fresh", "/tmp"],
             vec!["--apply", "--resume", "/tmp"],
-            vec!["--apply", "--fresh", "/tmp"],
         ] {
             let e = parse(args(&argv).into_iter(), ioc.clone()).expect_err("must refuse");
             assert!(matches!(e, Rejection::Conflict { .. }), "{argv:?}: {e:?}");
         }
+        let e = parse(
+            args(&["--apply", "--resume", "/tmp"]).into_iter(),
+            ioc.clone(),
+        )
+        .expect_err("must refuse");
+        assert_eq!(
+            e.to_string(),
+            "--apply and --resume cannot be given together: a check that moves files is never continued, it always starts from the beginning.\n\nNothing was scanned."
+        );
     }
 
     #[test]

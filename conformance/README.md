@@ -91,6 +91,9 @@ answer to be measured against.
 A `home` map is written under the fixture's home directory, for startup files,
 `~/.npmrc` and user-level persistence.
 
+An `args` list adds flags to the case's run, as `then.args` does for a second
+run of the same tree.
+
 **An absent file is not an empty file.** Empty means the question was asked and
 the answer was nothing. Absent means nobody asked, and the scan has to say so
 with a `[review]` line. `<name>.absent` records that the tool which would
