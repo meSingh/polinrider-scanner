@@ -1,0 +1,23 @@
+{
+  "why": "A range in a package.json says what would be accepted, not what was installed. ^13.5.0 could have resolved to 13.5.31, but it could equally have resolved to a clean release, and confirming it would flag projects that never had the bad build. An exact pin is what was installed, so it is confirmed.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/ranged/package.json": "{\"name\": \"ranged\", \"dependencies\": {\"cdeops\": \"^13.5.0\"}}\n",
+    "code/pinned/package.json": "{\"name\": \"pinned\", \"dependencies\": {\"cdeops\": \"13.5.31\"}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": "pinned/package.json"
+      }
+    ],
+    "must_not_report": [
+      "ranged"
+    ]
+  }
+}

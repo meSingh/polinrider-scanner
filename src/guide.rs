@@ -1459,6 +1459,17 @@ fn what_now(
         t.paths = paths_of(current, session.home, |k| k == Kind::Package);
         todos.push(t);
     }
+    if kinds_now.contains(&Kind::HijackedRelease) {
+        let mut t = todo(
+            "Change the hijacked package to another release",
+            &[
+                "The package is real; only the release named in the report is not.",
+                "Pin any other release, delete node_modules, reinstall.",
+            ],
+        );
+        t.paths = paths_of(current, session.home, |k| k == Kind::HijackedRelease);
+        todos.push(t);
+    }
     if kinds_now.contains(&Kind::StartupFile) {
         let mut t = todo(
             "Edit your shell startup file",
@@ -1507,6 +1518,15 @@ fn what_now(
             &[
                 "npm itself was changed to start the payload.",
                 "Install Node.js again, or this version of it in your version manager.",
+            ],
+        ));
+    }
+    if found.kinds().any(|k| k == Kind::AppStartup) {
+        todos.push(todo(
+            "Reinstall the editors and apps the report names",
+            &[
+                "Each one was changed to start the payload when it opens.",
+                "Quit it and install it again from its maker's site before you open it.",
             ],
         ));
     }

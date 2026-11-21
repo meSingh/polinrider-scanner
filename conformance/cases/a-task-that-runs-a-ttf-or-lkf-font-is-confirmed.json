@@ -1,0 +1,29 @@
+{
+  "why": "The October 2026 tasks run node ./public/fonts/fa-solid-300.ttf, and a second loader uses fa-solid.lkf with no weight. The task-command pattern named only .woff2 with a three-digit weight, so neither matched. It now takes any font or fake-font extension, with or without the weight (ADR-0065). Running node on a font has no innocent reading; a script handed a font name, or a fa-solid.js file, is ordinary and is not matched.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/victim/.vscode/tasks.json": "{\"version\": \"2.0.0\", \"tasks\": [{\"label\": \"fonts\", \"type\": \"shell\", \"command\": \"node ./public/fonts/fa-solid-300.ttf\", \"runOptions\": {\"runOn\": \"folderOpen\"}}]}\n",
+    "code/other/.vscode/tasks.json": "{\"version\": \"2.0.0\", \"tasks\": [{\"label\": \"fonts\", \"type\": \"shell\", \"command\": \"node public/fonts/fa-solid.lkf\", \"runOptions\": {\"runOn\": \"folderOpen\"}}]}\n",
+    "code/legit/package.json": "{\"name\": \"legit\", \"scripts\": {\"fonts\": \"node scripts/copy.js fa-solid-300.ttf\", \"icons\": \"node ./fonts/fa-solid.js\"}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "tasks.json runs on folder open AND contains an indicator",
+        "path": "victim/.vscode/tasks.json"
+      },
+      {
+        "level": "HIT",
+        "match": "tasks.json runs on folder open AND contains an indicator",
+        "path": "other/.vscode/tasks.json"
+      }
+    ],
+    "must_not_report": [
+      "legit"
+    ]
+  }
+}

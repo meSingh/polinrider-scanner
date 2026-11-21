@@ -1,0 +1,32 @@
+{
+  "why": "The November 2026 second stage writes a copy of the loader into the startup files of VS Code, Cursor, Antigravity, Discord and GitHub Desktop and marks it with markers that are in strong.txt (Greenflagged, 2026-11-03). A startup file that holds a confirmed indicator runs the payload each time the editor opens, after the repository is cleaned and the package removed, and no check read these files before 3.2 (ADR-0064). The advice is to reinstall the app.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {},
+  "host": {
+    "platform": "linux\n",
+    "processes": "",
+    "connections": "",
+    "crontab": "",
+    "git-config": "",
+    "root/.keep": "",
+    "root/usr/share/code/resources/app/out/main.js": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n{{STRONG}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "VS Code's startup file contains an indicator",
+        "path": "usr/share/code/resources/app/out/main.js"
+      }
+    ],
+    "must_print": [
+      "Quit VS Code and install it again"
+    ]
+  }
+}

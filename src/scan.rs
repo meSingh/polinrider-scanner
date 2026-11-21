@@ -4,6 +4,7 @@
 //! scan, read its verdict and run another without starting a second process,
 //! and so that a test can do the same.
 
+use crate::apps;
 use crate::checks::{self, ImplantScope, OnInfectedConfig, Sink};
 use crate::host::Host;
 use crate::host_checks;
@@ -200,12 +201,14 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
             Some(host) => {
                 host_checks::npm_config(home, ind, v);
                 runtimes::npm_program(home, host, ind, v, sink);
+                apps::startup_files(home, host, ind, v, sink);
                 host_checks::interpreters(host, ind, v);
                 host_checks::connections(host, ind, v);
             }
             None => {
                 skipped(v, "npm configuration");
                 skipped(v, "npm's own program files");
+                skipped(v, "Editor and app startup files");
                 skipped(v, "Resident interpreters");
                 skipped(v, "Live connections");
             }
@@ -533,6 +536,7 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
     let strippable = count(|k| matches!(k, Kind::Config { strippable: true }));
     let not_strippable = count(|k| matches!(k, Kind::Config { strippable: false }));
     let packages = count(|k| matches!(k, Kind::Package));
+    let releases = count(|k| matches!(k, Kind::HijackedRelease));
     let by_hand = count(|k| matches!(k, Kind::StartupFile));
     let cleaning = run.command == "clean";
 
@@ -627,6 +631,13 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
                     "the manifests"
                 }
             ),
+            None,
+        );
+    }
+    if releases > 0 {
+        step(
+            &mut out,
+            "Change each hijacked package named above to another release: pin any other release, delete node_modules and reinstall.",
             None,
         );
     }

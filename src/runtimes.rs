@@ -28,7 +28,7 @@ use std::path::{Path, PathBuf};
 
 /// Paths under `base` matching `pattern`, a `/`-separated path in which a
 /// component may hold one `*`. Sorted, and nothing that is not there.
-fn expand(base: &Path, pattern: &str) -> Vec<PathBuf> {
+pub(crate) fn expand(base: &Path, pattern: &str) -> Vec<PathBuf> {
     let mut current = vec![base.to_path_buf()];
     for part in pattern.split('/').filter(|p| !p.is_empty()) {
         let mut next = Vec::new();
@@ -65,7 +65,7 @@ fn expand(base: &Path, pattern: &str) -> Vec<PathBuf> {
 
 /// Add `path` unless the same file is already listed, under any name: a
 /// `lib64` that links to `lib`, or a home folder that is also a scanned root.
-fn push_unique(list: &mut Vec<(PathBuf, PathBuf)>, path: PathBuf) {
+pub(crate) fn push_unique(list: &mut Vec<(PathBuf, PathBuf)>, path: PathBuf) {
     let real = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
     if !list.iter().any(|(_, r)| *r == real) {
         list.push((path, real));

@@ -619,23 +619,55 @@ fn show_cut(plan: &Plan, v: &mut Verdict) {
     ));
 }
 
+/// What a font file of each kind the font check reads really starts with.
+/// Web fonts open `wOFF` or `wOF2`; TrueType and OpenType open with the
+/// version number `00 01 00 00`, or `true`, `OTTO` or `typ1`. ADR-0065.
+pub const TRUETYPE_MAGIC: &[&[u8]] = &[b"\x00\x01\x00\x00", b"true", b"OTTO", b"typ1"];
+
+/// Is this a TrueType or OpenType font by its name, in lower case? The
+/// October 2026 loaders moved from `.woff2` to `fa-solid-300.ttf`.
+pub fn is_truetype_name(lower: &str) -> bool {
+    lower.ends_with(".ttf") || lower.ends_with(".otf")
+}
+
+/// A TrueType or OpenType font larger than this is read for its first bytes
+/// only, and not hashed: real ones run to tens of megabytes, and every
+/// published fake font is under one. ADR-0065.
+pub const TRUETYPE_HASH_MAX: u64 = 4 * 1024 * 1024;
+
 pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
     v.section("Font files that are not fonts");
     let mut seen = 0usize;
     let mut flagged = 0usize;
 
-    for path in
-        walk.by_name(|n| (n.ends_with(".woff") || n.ends_with(".woff2")) && !n.starts_with("._"))
-    {
+    for path in walk.by_name(|n| {
+        let lower = n.to_ascii_lowercase();
+        (lower.ends_with(".woff") || lower.ends_with(".woff2") || is_truetype_name(&lower))
+            && !n.starts_with("._")
+    }) {
         if path.components().any(|c| c.as_os_str() == "__MACOSX") {
             continue;
         }
         seen += 1;
-        let Ok(bytes) = fs::read(path) else { continue };
+        let truetype = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| is_truetype_name(&n.to_ascii_lowercase()));
+        let large = truetype && fs::metadata(path).is_ok_and(|m| m.len() > TRUETYPE_HASH_MAX);
+        let bytes = if large {
+            // Its first four bytes decide; too large to be a published fake.
+            match first_bytes(path) {
+                Some(head) => head.to_vec(),
+                None => continue,
+            }
+        } else {
+            let Ok(bytes) = fs::read(path) else { continue };
+            bytes
+        };
 
         // A published fake font, by its hash: named, and caught even if it
         // ever starts with a font's magic bytes. ADR-0045.
-        if let Some(label) = ind.known_file(&bytes) {
+        if let Some(label) = (!large).then(|| ind.known_file(&bytes)).flatten() {
             flagged += 1;
             let line = sink.take(path, "font-masquerade");
             v.push(
@@ -663,7 +695,12 @@ pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
             // a confirmed hit either. The shell skips these too.
             continue;
         };
-        if magic == b"wOFF" || magic == b"wOF2" || magic == b"vers" {
+        let real = if truetype {
+            TRUETYPE_MAGIC.contains(&magic)
+        } else {
+            magic == b"wOFF" || magic == b"wOF2" || magic == b"vers"
+        };
+        if real {
             continue;
         }
 
@@ -695,7 +732,8 @@ pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
 }
 
 /// Campaign packages a project installs, read out of its manifests and
-/// lockfiles by name (ADR-0041). A name inside a longer one, or in a
+/// lockfiles by name (ADR-0041), and hijacked releases of real packages, by
+/// name and version (ADR-0063). A name inside a longer one, or in a
 /// description, is not a dependency on it.
 pub fn packages(walk: &Walk, ind: &Indicators, v: &mut Verdict) {
     v.section("Known-bad packages");
@@ -746,13 +784,101 @@ pub fn packages(walk: &Walk, ind: &Indicators, v: &mut Verdict) {
                 )));
             }
         }
+        let releases = ind.manifest_releases(name, &body);
+        if !releases.is_empty() {
+            found = true;
+            hijacked(v, path, &releases);
+        }
+    }
+
+    // node_modules is never walked (ADR-0025). What it has installed is
+    // read from a few files by name.
+    for dir in &walk.node_modules {
+        for (path, releases) in installed_releases(dir, ind) {
+            found = true;
+            hijacked(v, &path, &releases);
+        }
     }
 
     if !found {
         v.push(Finding::ok(
-            "no known-bad package names in manifests or lockfiles",
+            "no known-bad package names or releases in manifests or lockfiles",
         ));
     }
+}
+
+/// The finding for a file that resolves, pins or is a hijacked release.
+fn hijacked(v: &mut Verdict, path: &Path, releases: &[(String, String)]) {
+    for (name, version) in releases {
+        v.detail(format!("{name} {version}"));
+    }
+    v.push(
+        Finding::hit(
+            Kind::HijackedRelease,
+            format!("hijacked release of a real package installed: {}", path.display()),
+        )
+        .at(path)
+        .with_remedy(
+            "this release of a real package carries the payload. Change it to any other release, delete node_modules and the lockfile entry, reinstall.",
+        ),
+    );
+}
+
+/// The hijacked releases installed in one `node_modules`, each with the file
+/// that says so. Read by name, never walked: npm's own record of what it
+/// installed, each listed package's `package.json`, and pnpm's store folder
+/// for each listed release. The loader file itself is not read; the release
+/// is the proof. ADR-0063.
+fn installed_releases(dir: &Path, ind: &Indicators) -> Vec<(PathBuf, Vec<(String, String)>)> {
+    let mut out = Vec::new();
+    if ind.bad_releases.is_empty() {
+        return out;
+    }
+    let mut read = |path: PathBuf, file_name: &str| {
+        if let Ok(bytes) = fs::read(&path) {
+            let found = ind.manifest_releases(file_name, &String::from_utf8_lossy(&bytes));
+            if !found.is_empty() {
+                out.push((path, found));
+            }
+        }
+    };
+    read(dir.join(".package-lock.json"), "package-lock.json");
+    let mut names: Vec<&str> = ind.bad_releases.iter().map(|(n, _)| n.as_str()).collect();
+    names.sort_unstable();
+    names.dedup();
+    for name in names {
+        let path = name
+            .split('/')
+            .fold(dir.to_path_buf(), |p, part| p.join(part))
+            .join("package.json");
+        read(path, "package.json");
+    }
+    // pnpm keeps each release in .pnpm/<name, with / as +>@<version>, and a
+    // peer suffix after _ or ( when it has peers.
+    if let Ok(entries) = fs::read_dir(dir.join(".pnpm")) {
+        let mut folders: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+        folders.sort();
+        for folder in folders {
+            let Some(entry) = folder.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            let hits: Vec<(String, String)> = ind
+                .bad_releases
+                .iter()
+                .filter(|(name, version)| {
+                    let stem = format!("{}@{version}", name.replace('/', "+"));
+                    entry.strip_prefix(stem.as_str()).is_some_and(|rest| {
+                        rest.is_empty() || rest.starts_with('_') || rest.starts_with('(')
+                    })
+                })
+                .cloned()
+                .collect();
+            if !hits.is_empty() {
+                out.push((folder, hits));
+            }
+        }
+    }
+    out
 }
 
 /// The git hook check, one `.git` directory at a time, so a scan can read
@@ -1534,6 +1660,51 @@ mod tests {
                 && m.starts_with("config file matches a known campaign file (config fixture): ")));
         // None of the three is a sign that the payload ran on this machine.
         assert!(hits.iter().all(|(k, _)| !k.is_some_and(Kind::ran_here)));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn truetype_and_opentype_fonts_are_read_and_a_large_one_only_by_its_head() {
+        let dir = scratch("truetype");
+        let fake = dir.join("repo/public/fonts/fa-solid-300.ttf");
+        let upper = dir.join("repo/public/fonts/BRAND.TTF");
+        let real = dir.join("repo/public/fonts/inter.ttf");
+        let otf = dir.join("repo/public/fonts/inter.otf");
+        let mac = dir.join("repo/public/fonts/apple.ttf");
+        let big = dir.join("repo/public/fonts/cjk.ttf");
+        put(&fake, "(function(){})();\n");
+        put(&upper, "var a = 1;\n");
+        fs::create_dir_all(real.parent().expect("parent")).expect("mkdir");
+        fs::write(&real, b"\x00\x01\x00\x00 rest of a font").expect("write");
+        fs::write(&otf, b"OTTO rest of a font").expect("write");
+        fs::write(&mac, b"true rest of a font").expect("write");
+        // Over the limit, starts like a font: read for its head, never
+        // hashed, even when its bytes are a known file.
+        let mut body = b"\x00\x01\x00\x00".to_vec();
+        body.resize(usize::try_from(TRUETYPE_HASH_MAX).expect("fits") + 1, 0);
+        fs::write(&big, &body).expect("write");
+        let ind = Indicators {
+            strong: vec!["MARKER-ALPHA".into()],
+            hashes: vec![(crate::sha256::file(&big).expect("hash"), "big".into())],
+            ..Indicators::default()
+        };
+        let walk = Walk {
+            files: vec![fake.clone(), upper.clone(), real, otf, mac, big],
+            ..Walk::default()
+        };
+        let q = Quarantine::<DryRun>::new(dir.join("q"));
+        let mut v = Verdict::new();
+        fonts(&walk, &ind, &mut v, &mut Sink::Dry(&q));
+        let hits: Vec<&str> = v
+            .findings()
+            .filter(|f| f.level == crate::verdict::Level::Hit)
+            .map(|f| f.message.as_str())
+            .collect();
+        assert_eq!(hits.len(), 2, "{hits:?}");
+        assert!(hits.iter().any(|m| m
+            .starts_with("font file is not a font (first bytes: 28 66 75 6e)")
+            && m.ends_with("fa-solid-300.ttf")));
+        assert!(hits.iter().any(|m| m.ends_with("BRAND.TTF")));
         let _ = fs::remove_dir_all(&dir);
     }
 

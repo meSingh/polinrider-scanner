@@ -37,9 +37,9 @@ aa01a83c7a420c22a719b02ec327451ddd751ab5b189fd0127824ea43533b96a  ulid-xyz utils
 
 # --- the loaders force-pushed into GitHub repositories from 2026-10-22 to
 # 2026-10-26, from GitGuardian's indicator table, 2026-10-27. The tasks.json is
-# read wherever it sits. The font is a .ttf, which the font check does not
-# read, and api.js is a source file, so those two catch a copy renamed into a
-# hashed place; the strings in strong.txt are what find them where they lie.
+# read wherever it sits, and from 3.2 so is the .ttf font (ADR-0065). api.js is
+# a source file, so its hash catches a copy renamed into a hashed place; the
+# strings in strong.txt are what find it where it lies.
 # See docs-site/src/content/docs/indicator-reviews/2026-11-16.md.
 284d167f51c93b90100b7faeaec971959c1f8bb642e7ea0de50190a5a306f3d8  .vscode/tasks.json that runs fa-solid-300.ttf on folder open
 7ba0a30eabfa46008d6417532533199bbf351b27f3841477e9133f43fb404d24  fake font public/fonts/fa-solid-300.ttf

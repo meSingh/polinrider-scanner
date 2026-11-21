@@ -1,0 +1,63 @@
+---
+title: PolinRider Scanner and Cleaner 3.2.0
+description: Finds the campaign's hijacked npm releases, the editor and app startup files its second stage changes, and fake fonts with .ttf and .otf names.
+version: "3.2.0"
+# The expected release day. Once the tag exists the site shows the tag's date
+# instead, so this never needs correcting after the release.
+date: "2026-11-21"
+---
+
+import Downloads from '~/components/Downloads.astro';
+import Released from '~/components/Released.astro';
+import RunBlock from '~/components/RunBlock.astro';
+
+<Released version="3.2.0" date="2026-11-21" /> No breaking changes.
+
+## New
+
+- **Hijacked releases of real packages are found.** In early November the
+  campaign took over ten packages of a legitimate project and published one
+  infected release of each. A project whose lockfile pins one of those
+  releases, or that has one installed in `node_modules`, is now confirmed.
+  Other releases of the same packages are not reported. The advice is to
+  change to any other release and reinstall.
+- **Editor and app startup files are read.** The campaign's second stage
+  changes the startup files of VS Code, Cursor, Antigravity, Discord and
+  GitHub Desktop so the payload starts each time one opens. A changed file is
+  confirmed, with the advice to quit the app and install it again.
+  `--apply` moves the changed file into quarantine.
+- **A GitHub action,** [meSingh/polinrider-action](https://github.com/meSingh/polinrider-action),
+  runs this release's binary on every push and pull request, pinned by hash.
+  The copy you vendor into your own repository is still there for those who
+  would rather trust nothing outside it. See
+  [Block PolinRider in CI](/docs/guides/ci/).
+
+## Changed
+
+- **Fake fonts named `.ttf` and `.otf` are read,** as `.woff` and `.woff2`
+  already were. A real font stays quiet; a file with a font's name that is not
+  a font is confirmed. An editor task that runs a fake font of any of these
+  names is confirmed too.
+- **The `var z` tag of the campaign is confirmed when it sits on its own line**
+  before the number table it travels with, not only after padding.
+- **The 38 indicators of the 16 November review** ship in this release: a
+  third operator wallet, its addresses and the markers of the second stage.
+- `polinrider --version` counts the hijacked releases it knows.
+
+## Breaking changes
+
+None. Exit codes, commands and flags are as in the previous release. A
+project or machine that 3.1.0 called clean can now come back as infected,
+exit 2: that is these files being found, not a change to what the exit codes
+mean.
+
+## Download
+
+<Downloads version="3.2.0" packages />
+
+Or use a package manager. Choose your system, then run only its commands:
+
+<RunBlock />
+
+[Verify what you downloaded](/docs/reference/verifying/) before
+you run it.

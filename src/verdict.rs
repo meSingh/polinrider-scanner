@@ -56,6 +56,9 @@ pub enum Kind {
     TasksJson,
     /// A campaign package named in a manifest.
     Package,
+    /// A hijacked release of a real package, resolved in a lockfile, pinned
+    /// in a manifest or installed in `node_modules`. ADR-0063.
+    HijackedRelease,
     /// A git hook carrying an indicator.
     GitHook,
     /// The second-stage implant, on disk.
@@ -81,6 +84,10 @@ pub enum Kind {
     NpmProgram,
     /// A Python `.pth` file, which Python runs every time it starts.
     PthFile,
+    /// An editor's or a desktop app's startup file, or the loader copy beside
+    /// it, changed so that the app starts the payload when it opens.
+    /// ADR-0064.
+    AppStartup,
     /// Windows: a registry Run entry or a scheduled task. Not a file, so it
     /// cannot be moved; a command removes it.
     Autostart,
@@ -105,6 +112,7 @@ impl Kind {
                 | Kind::FakeFont
                 | Kind::TasksJson
                 | Kind::Package
+                | Kind::HijackedRelease
                 | Kind::NamedFile
         )
     }
@@ -123,6 +131,7 @@ impl Kind {
                 | Kind::LoginItem
                 | Kind::NpmProgram
                 | Kind::PthFile
+                | Kind::AppStartup
         )
     }
 
@@ -158,6 +167,10 @@ impl Kind {
             Kind::Package => (
                 "project that depends on a campaign package",
                 "projects that depend on a campaign package",
+            ),
+            Kind::HijackedRelease => (
+                "project that installs a hijacked release of a real package",
+                "projects that install a hijacked release of a real package",
             ),
             Kind::GitHook => (
                 "git hook carrying the payload",
@@ -203,6 +216,10 @@ impl Kind {
                 "Python startup file that runs the payload",
                 "Python startup files that run the payload",
             ),
+            Kind::AppStartup => (
+                "editor or app changed to start the payload",
+                "editors or apps changed to start the payload",
+            ),
             Kind::Autostart => (
                 "entry that starts the payload when Windows starts",
                 "entries that start the payload when Windows starts",
@@ -237,6 +254,7 @@ impl Kind {
             Kind::Registry => "An npm setting",
             Kind::NpmProgram => "A changed copy of npm",
             Kind::PthFile => "A Python startup file",
+            Kind::AppStartup => "A changed editor or app",
             Kind::Autostart => "An entry that starts with Windows",
             Kind::SshKey => "The attacker's SSH key",
             Kind::Process => "A running program",
@@ -245,6 +263,7 @@ impl Kind {
             | Kind::FakeFont
             | Kind::TasksJson
             | Kind::Package
+            | Kind::HijackedRelease
             | Kind::NamedFile => "A file in a project",
         }
     }

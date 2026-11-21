@@ -14,7 +14,7 @@
 //!
 //! This module and `host` are the only two that run a command.
 
-use crate::checks::{is_build_config, payload_shaped_tail};
+use crate::checks::{is_build_config, is_truetype_name, payload_shaped_tail, TRUETYPE_MAGIC};
 use crate::host::Probe;
 use crate::indicators::Indicators;
 use crate::pattern::Pattern;
@@ -1243,6 +1243,7 @@ fn is_hash_candidate(path: &str) -> bool {
         && (path == ".vscode/tasks.json" || path.ends_with("/.vscode/tasks.json")))
         || lower.ends_with(".woff")
         || lower.ends_with(".woff2")
+        || is_truetype_name(&lower)
         || is_build_config(name)
 }
 
@@ -1295,7 +1296,8 @@ fn is_fake_font(path: &str, bytes: &[u8]) -> bool {
 fn fake_font_magic(path: &str, bytes: &[u8]) -> Option<String> {
     let name = path.rsplit('/').next().unwrap_or(path);
     let lower = name.to_ascii_lowercase();
-    if !(lower.ends_with(".woff") || lower.ends_with(".woff2"))
+    let truetype = is_truetype_name(&lower);
+    if !(lower.ends_with(".woff") || lower.ends_with(".woff2") || truetype)
         || name.starts_with("._")
         || path.split('/').any(|part| part == "__MACOSX")
     {
@@ -1306,7 +1308,14 @@ fn fake_font_magic(path: &str, bytes: &[u8]) -> Option<String> {
     let magic = bytes.get(..4);
     let real = bytes.is_empty()
         || bytes.starts_with(b"version https://git-lfs")
-        || matches!(magic, Some(b"wOFF" | b"wOF2") | None);
+        || magic.is_none()
+        || magic.is_some_and(|m| {
+            if truetype {
+                TRUETYPE_MAGIC.contains(&m)
+            } else {
+                m == b"wOFF" || m == b"wOF2"
+            }
+        });
     (!real).then(|| {
         magic
             .unwrap_or_default()
@@ -1697,7 +1706,7 @@ pub(crate) fn check_ref(
         }
 
         let lower = name.to_ascii_lowercase();
-        if lower.ends_with(".woff") || lower.ends_with(".woff2") {
+        if lower.ends_with(".woff") || lower.ends_with(".woff2") || is_truetype_name(&lower) {
             if let Some(bytes) = mirror.blob(git_ref, &path) {
                 if let Some(hex) = fake_font_magic(&path, &bytes) {
                     finding.fake_fonts.push((path.clone(), hex));
@@ -2190,6 +2199,10 @@ mod tests {
                         b"version https://git-lfs.github.com/spec/v1\n",
                     ),
                     ("scripts/temp_helper.bat", b"@echo off\n"),
+                    // From 3.2 TrueType and OpenType too. ADR-0065.
+                    ("public/fonts/brand.ttf", b"(function(){})();\n"),
+                    ("public/fonts/real.ttf", b"\x00\x01\x00\x00 rest of a font"),
+                    ("public/fonts/real.otf", b"OTTO rest of a font"),
                 ],
             )],
         );
@@ -2197,9 +2210,27 @@ mod tests {
         let finding = &found.confirmed[0];
         assert_eq!(
             finding.real_paths(),
-            vec!["public/fonts/inter.woff2", "scripts/temp_helper.bat"]
+            vec![
+                "public/fonts/brand.ttf",
+                "public/fonts/inter.woff2",
+                "scripts/temp_helper.bat"
+            ]
         );
-        assert_eq!(finding.fake_fonts[0].1, "76 61 72 20");
+        let hex = |p: &str| {
+            finding
+                .fake_fonts
+                .iter()
+                .find(|(path, _)| path == p)
+                .map(|(_, hex)| hex.clone())
+        };
+        assert_eq!(
+            hex("public/fonts/inter.woff2").as_deref(),
+            Some("76 61 72 20")
+        );
+        assert_eq!(
+            hex("public/fonts/brand.ttf").as_deref(),
+            Some("28 66 75 6e")
+        );
     }
 
     #[test]

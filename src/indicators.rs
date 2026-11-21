@@ -28,6 +28,10 @@ pub struct Indicators {
     pub weak: Vec<String>,
     /// Campaign package names, as they appear in a manifest or lockfile.
     pub bad_packages: Vec<String>,
+    /// Hijacked releases of real packages, `(name, version)`, from
+    /// `bad-package-versions.txt`. Never matched as text: the name alone is
+    /// a real package. ADR-0063.
+    pub bad_releases: Vec<(String, String)>,
     /// Campaign hosts and addresses.
     pub network: Vec<String>,
     /// Implant binary and process names. Matched against a process name only,
@@ -69,6 +73,8 @@ pub enum LoadError {
     /// silently stopped working.
     /// The file it is in, and why.
     Pattern(&'static str, BadPattern),
+    /// A line of `bad-package-versions.txt` that is not `name@version`.
+    Release(String),
 }
 
 impl std::fmt::Display for LoadError {
@@ -81,6 +87,10 @@ impl std::fmt::Display for LoadError {
                 write!(f, "cannot read {}: {source}", file.display())
             }
             LoadError::Pattern(file, bad) => write!(f, "in {file}, {bad}"),
+            LoadError::Release(line) => write!(
+                f,
+                "in bad-package-versions.txt, cannot use '{line}': it is not name@version"
+            ),
             LoadError::Empty => f.write_str(
                 "the indicator set is empty. Refusing to scan: every result would be clean",
             ),
@@ -116,6 +126,7 @@ fn read_list(dir: &Path, name: &str, required: bool) -> Result<Vec<String>, Load
 pub const FILES: &[&str] = &[
     "strong.txt",
     "bad-packages.txt",
+    "bad-package-versions.txt",
     "weak.txt",
     "network.txt",
     "implant-names.txt",
@@ -125,6 +136,16 @@ pub const FILES: &[&str] = &[
     "ssh-keys.txt",
     "hashes.txt",
 ];
+
+/// `name@version`, split at the last `@` that does not open a scope. Both
+/// halves must be there and hold no blank.
+fn release_line(line: &str) -> Option<(String, String)> {
+    let line = line.trim();
+    let at = line.rfind('@').filter(|at| *at > 0)?;
+    let (name, version) = (line.get(..at)?, line.get(at + 1..)?);
+    let fine = |s: &str| !s.is_empty() && !s.contains(char::is_whitespace);
+    (fine(name) && fine(version) && name != "@").then(|| (name.to_string(), version.to_string()))
+}
 
 impl Indicators {
     pub fn load(dir: &Path) -> Result<Self, LoadError> {
@@ -144,6 +165,10 @@ impl Indicators {
             strong,
             weak: read_list(dir, "weak.txt", false)?,
             bad_packages,
+            bad_releases: read_list(dir, "bad-package-versions.txt", false)?
+                .iter()
+                .map(|l| release_line(l).ok_or_else(|| LoadError::Release(l.clone())))
+                .collect::<Result<_, _>>()?,
             network: read_list(dir, "network.txt", false)?,
             implant_names: read_list(dir, "implant-names.txt", false)?,
             filenames: read_list(dir, "filenames.txt", false)?
@@ -329,9 +354,28 @@ impl Indicators {
         }
     }
 
+    /// The hijacked releases a manifest or lockfile resolves or pins, sorted.
+    /// A file that cannot be read as its format gives none: its names are
+    /// still matched as text, and the reader is told it could not be read.
+    /// ADR-0063.
+    pub fn manifest_releases(&self, file_name: &str, text: &str) -> Vec<(String, String)> {
+        if self.bad_releases.is_empty() {
+            return Vec::new();
+        }
+        manifest::package_releases(file_name, text)
+            .map(|found| {
+                found
+                    .into_iter()
+                    .filter(|r| self.bad_releases.contains(r))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Does this file, by its path and its bytes, carry a confirmed
-    /// indicator? A manifest is read for the names it installs; anything else
-    /// is matched as text. For the GitHub check, which meets files by path.
+    /// indicator? A manifest is read for the names it installs and the
+    /// releases it resolves; anything else is matched as text. For the
+    /// GitHub check, which meets files by path.
     pub fn file_confirms(&self, path: &str, bytes: &[u8]) -> bool {
         let name = path.rsplit('/').next().unwrap_or(path);
         if !manifest::is_manifest(name) {
@@ -344,6 +388,7 @@ impl Indicators {
                 ManifestMatch::Clean => false,
                 ManifestMatch::Unreadable { text_match, .. } => text_match,
             }
+            || !self.manifest_releases(name, &text).is_empty()
     }
 
     /// The campaign host or address this line names, if it names one.
@@ -674,6 +719,123 @@ mod tests {
             format!("{gi} = 'B11';"),
         ] {
             assert!(!ind.has_strong(&not_confirmed), "{not_confirmed}");
+        }
+    }
+
+    #[test]
+    fn a_release_line_is_name_at_version_and_anything_else_refuses_to_load() {
+        let r = |n: &str, v: &str| Some((n.to_string(), v.to_string()));
+        assert_eq!(release_line("cdeops@13.5.31"), r("cdeops", "13.5.31"));
+        assert_eq!(
+            release_line("@adminide-stack/utils@0.0.16-129"),
+            r("@adminide-stack/utils", "0.0.16-129")
+        );
+        for bad in [
+            "cdeops",
+            "@scope/name",
+            "cdeops@",
+            "@1.0.0",
+            "@@1.0.0",
+            "a b@1",
+        ] {
+            assert_eq!(release_line(bad), None, "{bad}");
+        }
+        let dir = std::env::temp_dir().join(format!("prc-ind-rel-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).expect("mkdir");
+        fs::write(dir.join("strong.txt"), "MARKER\n").expect("write");
+        fs::write(dir.join("bad-packages.txt"), "evil\n").expect("write");
+        fs::write(
+            dir.join("bad-package-versions.txt"),
+            "# c\ngood@1.0.0\ncdeops\n",
+        )
+        .expect("write");
+        let e = Indicators::load(&dir).expect_err("refused");
+        assert_eq!(
+            e.to_string(),
+            "in bad-package-versions.txt, cannot use 'cdeops': it is not name@version"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_release_is_matched_by_name_and_version_together_never_as_text() {
+        let ind = Indicators {
+            strong: vec!["MARKER".into()],
+            bad_releases: vec![("cdeops".into(), "13.5.31".into())],
+            ..Indicators::default()
+        };
+        let lock = |v: &str| {
+            format!(
+                r#"{{"lockfileVersion":3,"packages":{{"node_modules/cdeops":{{"version":"{v}"}}}}}}"#
+            )
+        };
+        assert_eq!(
+            ind.manifest_releases("package-lock.json", &lock("13.5.31")),
+            [("cdeops".to_string(), "13.5.31".to_string())]
+        );
+        assert!(ind
+            .manifest_releases("package-lock.json", &lock("13.5.29"))
+            .is_empty());
+        assert!(ind
+            .manifest_releases("package-lock.json", &lock("13.5.310"))
+            .is_empty());
+        assert!(ind.file_confirms("app/package-lock.json", lock("13.5.31").as_bytes()));
+        assert!(!ind.file_confirms("app/package-lock.json", lock("13.5.29").as_bytes()));
+        // Not a manifest: the name and the version in text are nothing.
+        assert!(!ind.file_confirms("README.md", b"cdeops@13.5.31 was hijacked"));
+        assert!(!ind.has_strong("require('cdeops') // 13.5.31"));
+    }
+
+    /// The task command that runs a fake font, against the shipped `ioc/`:
+    /// any font or fake-font extension, with or without the weight. ADR-0065.
+    #[test]
+    fn node_running_a_font_of_any_font_extension_is_confirmed() {
+        let ind = Indicators::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("ioc"))
+            .expect("the shipped indicator set loads");
+        for confirmed in [
+            r#""command": "node ./public/fonts/fa-solid-300.ttf""#,
+            r#""command": "node public/fonts/fa-solid.lkf""#,
+            r#""command": "node  ./fonts/fa-solid-500.woff""#,
+            r#""command": "node /tmp/fa-solid-900.otf""#,
+        ] {
+            assert!(ind.has_strong(confirmed), "{confirmed}");
+        }
+        for not_confirmed in [
+            "node scripts/copy.js fa-solid-300.ttf",
+            "node ./fonts/fa-solid.js",
+            "node ./fonts/fa-solid-300.json",
+            "cp ./fonts/fa-solid-300.ttf dist/",
+        ] {
+            assert!(!ind.has_strong(not_confirmed), "{not_confirmed}");
+        }
+    }
+
+    /// The second npm variant's tag, inserted as its own lines with no
+    /// padding, before the six-number NX table. Only the two together.
+    #[test]
+    fn the_unpadded_var_z_tag_needs_the_six_number_table_after_it() {
+        let ind = Indicators::load(&Path::new(env!("CARGO_MANIFEST_DIR")).join("ioc"))
+            .expect("the shipped indicator set loads");
+        let table = "6912847, 367, 20411, 613, 43759, 5019283";
+        for confirmed in [
+            format!("var z = '-II';\nvar NX = [{table}];\n"),
+            format!("var z = '-%';\r\nvar NX=[{}];", table.replace(", ", ",")),
+            format!("module.exports = x;\nvar z = '-E';\n\tvar NX = [{table}];"),
+            format!("var z='-1234567890'; var NX=[{table}];"),
+        ] {
+            assert!(ind.has_strong(&confirmed), "{confirmed:?}");
+        }
+        for not_confirmed in [
+            "var z = '-II';\nmodule.exports = z;\n".to_string(),
+            "var z = '-II';\nvar NX = [1, 2];\n".to_string(),
+            format!("var NX = [{table}];\n"),
+            format!("var z = '-II';{}var NX = [{table}];", "\n".repeat(9)),
+            format!("var z = '-II';\nvar a = 1;\nvar NX = [{table}];"),
+            format!("var z = 'II';\nvar NX = [{table}];"),
+            format!("var z = '-II';\nvar NX = [{table}, 9];"),
+        ] {
+            assert!(!ind.has_strong(&not_confirmed), "{not_confirmed:?}");
         }
     }
 

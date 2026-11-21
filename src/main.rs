@@ -459,6 +459,7 @@ fn about(ui: &Ui) -> String {
             let counts = [
                 count(i.strong.len(), "strong"),
                 count(i.bad_packages.len(), "packages"),
+                count(i.bad_releases.len(), "package releases"),
                 count(i.network.len(), "network"),
                 count(i.implant_names.len(), "implant names"),
                 count(i.weak.len(), "weak"),

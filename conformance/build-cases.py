@@ -249,7 +249,7 @@ case(
     },
     expect={
         "exit": 0,
-        "findings": [{"level": "ok", "match": "no known-bad package names in manifests"}],
+        "findings": [{"level": "ok", "match": "no known-bad package names or releases in manifests"}],
         "must_not_report": ["[HIT]", "package.json", "yarn.lock", "pnpm-lock.yaml"],
     },
 )

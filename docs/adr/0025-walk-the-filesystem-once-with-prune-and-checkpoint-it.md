@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md), which lists each pruned `node_modules` and reads a few named files in it |
 | **Date** | 2026-09-16 |
 
 ## Context

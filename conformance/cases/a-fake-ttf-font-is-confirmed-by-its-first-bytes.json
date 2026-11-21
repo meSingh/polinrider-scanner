@@ -1,0 +1,23 @@
+{
+  "why": "The loaders force-pushed in late October 2026 hide the payload in public/fonts/fa-solid-300.ttf, and until 3.2 the font check read only .woff and .woff2, so the file was a review line by its name and nothing more. A TrueType font opens with 00 01 00 00, true, OTTO or typ1; this one opens with JavaScript, so it is confirmed by its first bytes, as a .woff2 is (ADR-0065). Its name is also in filenames-review.txt; once the bytes confirm the file, the name adds nothing and is not repeated.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/public/fonts/fa-solid-300.ttf": "(function(){var a=require('fs');})();\n",
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "font file is not a font (first bytes: 28 66 75 6e)",
+        "path": "fa-solid-300.ttf"
+      }
+    ],
+    "must_not_report": [
+      "src/index.js"
+    ]
+  }
+}

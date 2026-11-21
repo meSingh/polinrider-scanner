@@ -14,6 +14,7 @@ three local checks at once.
 | `strong.txt` | Confirmed PolinRider artifacts | `INFECTED` |
 | `strong-patterns.txt` | Patterns over file contents where a part rotates (extended regex, with a fixed part of 3 or more characters, no `^` or `$`) | `INFECTED` (ADR-0052) |
 | `bad-packages.txt` | Malicious package names from the campaign | `INFECTED` |
+| `bad-package-versions.txt` | Releases of real packages that were hijacked, as `name@version`: the name alone is not an indicator | `INFECTED` when a manifest, lockfile or `node_modules` has that release (ADR-0063) |
 | `filenames.txt` | Paths that are indicators on their own (extended regex) | `INFECTED` |
 | `filenames-review.txt` | Paths worth a look that legitimate projects can also have (extended regex) | `review` only (ADR-0048) |
 | `ssh-keys.txt` | SSH keys the campaign adds to `~/.ssh/authorized_keys`: a key's comment or the key itself | `INFECTED`, removed by hand (ADR-0049) |
@@ -41,6 +42,16 @@ own, so `sass-format` is not found inside `sass-formatter`. See
 [ADR-0041](../docs/adr/0041-package-names-are-read-from-manifests-and-compared-whole.md).
 `ci/scan-workspace.sh` compares names the same way (it reads `package.json` and
 `package-lock.json` with `jq`, and matches them as text where `jq` is missing).
+
+`bad-package-versions.txt` holds `name@version` pairs, for a real package
+whose releases were hijacked: one per line, split at the last `@`. A lockfile
+(`package-lock.json` v1 to v3, `yarn.lock` v1 and berry, `pnpm-lock.yaml`) is
+read for the release it resolved, a `package.json` for an exact pin and its own
+name and version, and inside `node_modules` only npm's
+`.package-lock.json`, each listed package's own `package.json` and pnpm's
+`.pnpm/<name>@<version>` folder are looked at. A line that is not
+`name@version` stops the scan. See
+[ADR-0063](../docs/adr/0063-a-hijacked-release-is-matched-by-name-and-version.md).
 
 `implant-names.txt` is matched against the **process name only**, never the full
 command line. Matching a command line would report this scanner, and anyone
