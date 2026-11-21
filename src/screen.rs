@@ -203,6 +203,7 @@ fn plain(kind: Kind, message: &str) -> String {
         Kind::TasksJson => "an editor task runs the payload when the folder opens",
         Kind::FakeFont => "a font file is really a script",
         Kind::Package => "a project depends on a campaign package",
+        Kind::HijackedRelease => "a project installs a hijacked release of a real package",
         Kind::GitHook => "a git hook carries the payload",
         Kind::Implant => "the second-stage implant is on this disk",
         Kind::Propagation => "the script the payload spreads with is here",

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Proposed; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md), which adds hijacked releases as a second list, by name and version, never matched as text |
 | **Date** | 2026-10-13 |
 
 ## Context

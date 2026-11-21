@@ -13,7 +13,7 @@
     "findings": [
       {
         "level": "ok",
-        "match": "no known-bad package names in manifests"
+        "match": "no known-bad package names or releases in manifests"
       }
     ],
     "must_not_report": [

@@ -57,6 +57,209 @@ pub fn package_names(file_name: &str, text: &str) -> Result<Vec<String>, String>
     }
 }
 
+/// Every release, `(name, version)`, that `text` resolves or pins, for a file
+/// called `file_name`. A lockfile gives what it resolved; a `package.json`
+/// gives its own name and version, and each dependency's value as written,
+/// so an exact pin compares equal to a release and a range never does.
+/// `Err` as for [`package_names`]. ADR-0063.
+pub fn package_releases(file_name: &str, text: &str) -> Result<Vec<(String, String)>, String> {
+    let mut out = match file_name {
+        "package.json" | "package-lock.json" => {
+            let root = parse_json(text)?;
+            json_releases(&root)?
+        }
+        "yarn.lock" => yarn_releases(text)?,
+        "pnpm-lock.yaml" => pnpm_releases(text)?,
+        other => return Err(format!("{other} is not a manifest")),
+    };
+    out.retain(|(n, v)| !n.is_empty() && !v.is_empty());
+    out.sort_unstable();
+    out.dedup();
+    Ok(out)
+}
+
+/// A version as a lockfile or a pin writes it: `=1.2.3` and `v1.2.3` are
+/// `1.2.3`, and a peer suffix (`1.2.3(react@18)`, pnpm) is not part of it.
+fn bare_version(v: &str) -> String {
+    let v = v.trim().trim_matches('"').trim_matches('\'');
+    let v = v.strip_prefix('=').unwrap_or(v);
+    let v = v.strip_prefix('v').unwrap_or(v);
+    v.split('(').next().unwrap_or(v).trim().to_string()
+}
+
+/// One dependency's value, or a lockfile's `version`, under `name`: the
+/// release it names. `npm:real@1.2.3` names a release of `real`.
+fn push_release(name: &str, value: &str, out: &mut Vec<(String, String)>) {
+    if let Some(target) = value.strip_prefix("npm:") {
+        let real = name_of_spec(target);
+        if let Some(version) = target.get(real.len() + 1..) {
+            out.push((real.to_string(), bare_version(version)));
+        }
+        return;
+    }
+    out.push((name.to_string(), bare_version(value)));
+}
+
+fn json_releases(root: &Json) -> Result<Vec<(String, String)>, String> {
+    if !matches!(root, Json::Obj(_)) {
+        return Err("the document is not an object".into());
+    }
+    let mut out = Vec::new();
+    // The package itself: a copy of a hijacked release is that release.
+    if let (Some(name), Some(version)) = (
+        root.get("name").and_then(Json::as_str),
+        root.get("version").and_then(Json::as_str),
+    ) {
+        out.push((name.to_string(), bare_version(version)));
+    }
+    for key in DEPENDENCY_KEYS {
+        let Some(map) = root.get(key) else { continue };
+        if *key == "dependencies" && map.members().iter().any(|(_, v)| matches!(v, Json::Obj(_))) {
+            lockfile_v1_releases(map, &mut out);
+        } else {
+            for (name, value) in map.members() {
+                if let Some(value) = value.as_str() {
+                    push_release(name, value, &mut out);
+                }
+            }
+        }
+    }
+    // package-lock.json v2 and v3: each installed path with its version. An
+    // aliased one carries the real name in "name".
+    if let Some(packages) = root.get("packages") {
+        for (path, entry) in packages.members() {
+            let Some(version) = entry.get("version").and_then(Json::as_str) else {
+                continue;
+            };
+            let name = entry
+                .get("name")
+                .and_then(Json::as_str)
+                .or_else(|| path.rsplit_once("node_modules/").map(|(_, n)| n));
+            if let Some(name) = name {
+                push_release(name, version, &mut out);
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// package-lock.json v1: a name, its `version`, and its own nested
+/// `dependencies`. Bounded by the parse.
+fn lockfile_v1_releases(map: &Json, out: &mut Vec<(String, String)>) {
+    for (name, entry) in map.members() {
+        if let Some(version) = entry.get("version").and_then(Json::as_str) {
+            push_release(name, version, out);
+        }
+        if let Some(nested) = entry.get("dependencies") {
+            lockfile_v1_releases(nested, out);
+        }
+    }
+}
+
+/// yarn.lock: the names of an entry's header, then its `version` line
+/// (`version "1.2.3"` in v1, `version: 1.2.3` in berry). An alias header
+/// installs the package it points at. berry's `resolution:` names the real
+/// package and release too.
+fn yarn_releases(text: &str) -> Result<Vec<(String, String)>, String> {
+    // The same reading as for names, so a file is refused for one exactly
+    // when it is refused for the other.
+    yarn_names(text)?;
+    let mut out = Vec::new();
+    let mut current: Vec<String> = Vec::new();
+    for line in text.lines() {
+        let line = line.trim_end_matches('\r');
+        if line.trim().is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if !(line.starts_with(' ') || line.starts_with('\t')) {
+            current.clear();
+            let header = line.strip_suffix(':').unwrap_or(line);
+            if header == "__metadata" {
+                continue;
+            }
+            for spec in header.split(',') {
+                let spec = spec.trim().trim_matches('"');
+                let name = name_of_spec(spec);
+                let installed = spec
+                    .get(name.len() + 1..)
+                    .and_then(alias_target)
+                    .unwrap_or(name);
+                current.push(installed.to_string());
+            }
+            continue;
+        }
+        let field = line.trim_start();
+        if let Some(rest) = field
+            .strip_prefix("version ")
+            .or_else(|| field.strip_prefix("version:"))
+        {
+            for name in &current {
+                out.push((name.clone(), bare_version(rest)));
+            }
+        } else if let Some(rest) = field.strip_prefix("resolution:") {
+            let spec = rest.trim().trim_matches('"');
+            let name = name_of_spec(spec);
+            if let Some(version) = spec.get(name.len() + 1..) {
+                let version = version.strip_prefix("npm:").unwrap_or(version);
+                out.push((name.to_string(), bare_version(version)));
+            }
+        }
+    }
+    Ok(out)
+}
+
+/// pnpm-lock.yaml: the release in each key under `packages:` or
+/// `snapshots:`, `/a@1.0.0(peer@1)` (v6), `a@1.0.0` (v9) or `/a/1.0.0_peer`
+/// (v5).
+fn pnpm_releases(text: &str) -> Result<Vec<(String, String)>, String> {
+    pnpm_names(text)?;
+    // v5 writes /name/version_peer; later versions /name@version(peer).
+    let v5 = text.lines().any(|l| {
+        l.strip_prefix("lockfileVersion:").is_some_and(|v| {
+            v.trim()
+                .trim_matches('\'')
+                .trim_matches('"')
+                .starts_with('5')
+        })
+    });
+    let mut out = Vec::new();
+    let mut section = "";
+    for line in text.lines() {
+        let line = line.trim_end_matches('\r');
+        let content = line.trim_start_matches(' ');
+        if content.is_empty() || content.starts_with('#') {
+            continue;
+        }
+        let indent = line.len() - content.len();
+        let Some(key) = yaml_key(content) else {
+            continue;
+        };
+        if indent == 0 {
+            section = key;
+            continue;
+        }
+        if !(matches!(section, "packages" | "snapshots") && indent == 2) {
+            continue;
+        }
+        let spec = key.trim_start_matches('/');
+        if v5 {
+            if let Some((name, version)) = spec.rsplit_once('/') {
+                if version.starts_with(|c: char| c.is_ascii_digit()) && !name.is_empty() {
+                    let version = version.split('_').next().unwrap_or(version);
+                    out.push((name.to_string(), bare_version(version)));
+                }
+            }
+            continue;
+        }
+        let spec = spec.split('(').next().unwrap_or(spec);
+        let name = name_of_spec(spec);
+        if let Some(version) = spec.get(name.len() + 1..) {
+            out.push((name.to_string(), bare_version(version)));
+        }
+    }
+    Ok(out)
+}
+
 /// The package a version specifier names, from `name@range`, `@scope/name@range`
 /// or a bare name.
 fn name_of_spec(spec: &str) -> &str {
@@ -626,6 +829,86 @@ mod tests {
         assert_eq!(got, ["a", "@s/b", "a", "@s/b", "@s/b"]);
         assert!(!got.iter().any(|n| n == "react" || n == "specifier"));
         assert!(package_names("pnpm-lock.yaml", "packages:\n  a@1: {}\n").is_err());
+    }
+
+    fn releases(file: &str, text: &str) -> Vec<(String, String)> {
+        package_releases(file, text).expect("parses")
+    }
+
+    fn has(got: &[(String, String)], name: &str, version: &str) -> bool {
+        got.iter().any(|(n, v)| n == name && v == version)
+    }
+
+    #[test]
+    fn a_package_json_gives_its_own_release_and_each_value_as_written() {
+        let text = r#"{"name":"cdeops","version":"13.5.31","dependencies":{
+            "a":"1.0.0","b":"=2.0.0","c":"^3.0.0","al":"npm:@s/real@4.0.0"}}"#;
+        let got = releases("package.json", text);
+        assert!(has(&got, "cdeops", "13.5.31"));
+        assert!(has(&got, "a", "1.0.0"));
+        assert!(has(&got, "b", "2.0.0"));
+        assert!(has(&got, "@s/real", "4.0.0"));
+        // A range is kept as written, so it never equals a release.
+        assert!(has(&got, "c", "^3.0.0"));
+        assert!(!got.iter().any(|(n, _)| n == "al"));
+    }
+
+    #[test]
+    fn package_lock_v1_v2_and_v3_give_what_they_resolved() {
+        let v1 = r#"{"name":"p","lockfileVersion":1,"dependencies":{
+            "a":{"version":"0.0.16-129","requires":{"b":"^1"},"dependencies":{"c":{"version":"2.0.0"}}},
+            "al":{"version":"npm:real@1.0.0"}}}"#;
+        let got = releases("package-lock.json", v1);
+        assert!(has(&got, "a", "0.0.16-129"));
+        assert!(has(&got, "c", "2.0.0"));
+        assert!(has(&got, "real", "1.0.0"));
+        assert!(!got.iter().any(|(n, _)| n == "b"));
+        let v3 = r#"{"name":"p","lockfileVersion":3,"packages":{
+            "":{"name":"p","version":"1.0.0","dependencies":{"a":"^1"}},
+            "node_modules/a":{"version":"1.0.0"},
+            "node_modules/a/node_modules/@s/b":{"version":"12.0.18-alpha.53"},
+            "node_modules/al":{"name":"real","version":"1.0.0"}}}"#;
+        let got = releases("package-lock.json", v3);
+        assert!(has(&got, "p", "1.0.0"));
+        assert!(has(&got, "a", "1.0.0"));
+        assert!(has(&got, "@s/b", "12.0.18-alpha.53"));
+        assert!(has(&got, "real", "1.0.0"));
+    }
+
+    #[test]
+    fn yarn_v1_and_berry_give_each_header_its_version() {
+        let v1 = "# yarn lockfile v1\n\n\"@s/a@^1.0.0\", \"@s/a@~1.1.0\":\n  version \"1.1.0\"\n\nb@^2.0.0, al@npm:real@^3:\n  version \"2.0.0\"\n  dependencies:\n    c \"^1\"\n";
+        let got = releases("yarn.lock", v1);
+        assert!(has(&got, "@s/a", "1.1.0"));
+        assert!(has(&got, "b", "2.0.0"));
+        assert!(has(&got, "real", "2.0.0"));
+        assert!(!got.iter().any(|(n, _)| n == "c" || n == "al"));
+        let berry = "__metadata:\n  version: 6\n\n\"left-pad@npm:^1.3.0\":\n  version: 1.3.0\n  resolution: \"left-pad@npm:1.3.0\"\n";
+        let got = releases("yarn.lock", berry);
+        assert_eq!(got, [("left-pad".to_string(), "1.3.0".to_string())]);
+        assert!(package_releases("yarn.lock", "<<<<<<< HEAD\nb@^1:\n").is_err());
+    }
+
+    #[test]
+    fn pnpm_v5_v6_and_v9_give_the_release_in_each_key() {
+        let v5 = "lockfileVersion: 5.4\n\npackages:\n\n  /a/1.0.0:\n    resolution: {integrity: x}\n  /@s/b/2.0.0_react@18.0.0:\n    dev: false\n";
+        let got = releases("pnpm-lock.yaml", v5);
+        assert!(has(&got, "a", "1.0.0"));
+        assert!(has(&got, "@s/b", "2.0.0"));
+        let v6 = "lockfileVersion: '6.0'\n\npackages:\n\n  /cdeops@13.5.31:\n    resolution: {integrity: x}\n  /@s/b@2.0.0(react@18.0.0):\n    dev: false\n";
+        let got = releases("pnpm-lock.yaml", v6);
+        assert!(has(&got, "cdeops", "13.5.31"));
+        assert!(has(&got, "@s/b", "2.0.0"));
+        let v9 = "lockfileVersion: '9.0'\n\npackages:\n\n  a@1.0.0:\n    resolution: {integrity: x}\n\n  '@s/b@2.0.0':\n    resolution: {integrity: x}\n\nsnapshots:\n\n  '@s/b@2.0.0(react@18.0.0)':\n    dependencies:\n      react: 18.0.0\n";
+        let got = releases("pnpm-lock.yaml", v9);
+        assert_eq!(
+            got,
+            [
+                ("@s/b".to_string(), "2.0.0".to_string()),
+                ("a".to_string(), "1.0.0".to_string())
+            ]
+        );
+        assert!(package_releases("pnpm-lock.yaml", "packages:\n  a@1: {}\n").is_err());
     }
 
     #[test]

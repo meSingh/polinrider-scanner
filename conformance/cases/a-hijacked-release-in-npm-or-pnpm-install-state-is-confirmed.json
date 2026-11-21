@@ -1,0 +1,37 @@
+{
+  "why": "A project's lockfile is not always committed or present, but the package manager records what it installed inside node_modules: npm in .package-lock.json, pnpm as a folder per release under .pnpm, with any peer suffix after the version. Both are read by name, never walked, and a hijacked release in either is confirmed.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/a/package.json": "{\"name\": \"a\", \"dependencies\": {\"cdeops\": \"^13.5.0\"}}\n",
+    "code/a/node_modules/.package-lock.json": "{\"name\": \"proj\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"proj\", \"version\": \"1.0.0\"}, \"node_modules/cdeops\": {\"version\": \"13.5.31\"}}}\n",
+    "code/b/package.json": "{\"name\": \"b\", \"dependencies\": {\"server-hemera-mongo\": \"^0.0.14\", \"@adminide-stack/forms-core\": \"^5.1.0\"}}\n",
+    "code/b/node_modules/.pnpm/server-hemera-mongo@0.0.16/node_modules/server-hemera-mongo/index.js": "module.exports = {};\n",
+    "code/b/node_modules/.pnpm/@adminide-stack+forms-core@5.1.9-alpha.3_react@18.2.0/node_modules/@adminide-stack/forms-core/index.js": "module.exports = {};\n",
+    "code/b/node_modules/.pnpm/server-hemera-mongo@0.0.160/node_modules/server-hemera-mongo/index.js": "module.exports = {};\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": "a/node_modules/.package-lock.json"
+      },
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": ".pnpm/server-hemera-mongo@0.0.16"
+      },
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": ".pnpm/@adminide-stack+forms-core@5.1.9-alpha.3_react@18.2.0"
+      }
+    ],
+    "must_not_report": [
+      "0.0.160"
+    ]
+  }
+}

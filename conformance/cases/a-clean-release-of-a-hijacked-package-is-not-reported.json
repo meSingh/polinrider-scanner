@@ -1,0 +1,22 @@
+{
+  "why": "The hijacked project published clean releases before and after the two bad days, and its users depend on them. cdeops 13.5.29 and server-hemera-mongo 0.0.11 are the 2026-11-16 review's exit-0 fixtures. Neither a lockfile nor an installed package naming a clean release may be a finding, which is why the names are not carried in bad-packages.txt at all.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/shop/package.json": "{\"name\": \"shop\", \"dependencies\": {\"cdeops\": \"13.5.29\", \"server-hemera-mongo\": \"^0.0.11\"}}\n",
+    "code/shop/package-lock.json": "{\"name\": \"proj\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"proj\", \"version\": \"1.0.0\"}, \"node_modules/cdeops\": {\"version\": \"13.5.29\"}, \"node_modules/server-hemera-mongo\": {\"version\": \"0.0.11\"}}}\n",
+    "code/shop/node_modules/cdeops/package.json": "{\"name\": \"cdeops\", \"version\": \"13.5.29\"}\n",
+    "code/shop/node_modules/server-hemera-mongo/package.json": "{\"name\": \"server-hemera-mongo\", \"version\": \"0.0.11\"}\n"
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "no known-bad package names or releases in manifests or lockfiles"
+    ],
+    "must_not_report": [
+      "[HIT]",
+      "[review]"
+    ]
+  }
+}

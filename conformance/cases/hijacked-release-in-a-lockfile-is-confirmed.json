@@ -1,0 +1,27 @@
+{
+  "why": "On 2026-11-03 and 2026-11-04 ten packages of a real project, some published since 2018, were released with the loader added, and npm removed the twelve releases within a day. The name alone is a legitimate package every user of a clean release depends on, so only the name and version together can be the indicator (ADR-0063). A lockfile that pins one resolved it, and the loader runs the moment the package is required.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/shop/package.json": "{\"name\": \"shop\", \"dependencies\": {\"@adminide-stack/utils\": \"^0.0.16-120\", \"react\": \"^18.0.0\"}}\n",
+    "code/shop/package-lock.json": "{\"name\": \"proj\", \"version\": \"1.0.0\", \"lockfileVersion\": 3, \"requires\": true, \"packages\": {\"\": {\"name\": \"proj\", \"version\": \"1.0.0\"}, \"node_modules/@adminide-stack/utils\": {\"version\": \"0.0.16-129\"}, \"node_modules/react\": {\"version\": \"18.2.0\"}}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": "shop/package-lock.json"
+      }
+    ],
+    "must_print": [
+      "@adminide-stack/utils 0.0.16-129",
+      "Change it to any other release"
+    ],
+    "must_not_report": [
+      "known-bad package referenced"
+    ]
+  }
+}

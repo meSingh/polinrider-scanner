@@ -1,0 +1,27 @@
+{
+  "why": "The 2026-11-16 review found that the loader inside an installed hijacked package exits 0, because the walk never enters node_modules (ADR-0025). With no lockfile there was nothing else to read. The installed package's own package.json says which release it is, and that file is read by name for each listed package; the release is the proof, so the loader file itself stays unread and the prune is unchanged (ADR-0063).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/shop/package.json": "{\"name\": \"shop\", \"dependencies\": {\"@adminide-stack/utils\": \"^0.0.16-120\"}}\n",
+    "code/shop/node_modules/@adminide-stack/utils/package.json": "{\"name\": \"@adminide-stack/utils\", \"version\": \"0.0.16-130\", \"main\": \"lib/index.js\"}\n",
+    "code/shop/node_modules/@adminide-stack/utils/lib/index.js": "'use strict';\nmodule.exports = {};\n{{PAD}}{{STRONG}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "hijacked release of a real package installed",
+        "path": "node_modules/@adminide-stack/utils/package.json"
+      }
+    ],
+    "must_print": [
+      "@adminide-stack/utils 0.0.16-130"
+    ],
+    "must_not_report": [
+      "lib/index.js"
+    ]
+  }
+}

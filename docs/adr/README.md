@@ -40,7 +40,7 @@ If you disagree with one, open an issue and quote its number.
 | [0022](./0022-q-quits-b-goes-back.md) | q quits, b goes back | Accepted |
 | [0023](./0023-the-entry-point-parses-before-it-runs.md) | The entry point parses before it runs | Accepted |
 | [0024](./0024-a-prompt-inside-a-loop-must-not-share-its-stdin.md) | A prompt inside a loop must not share its stdin | Accepted |
-| [0025](./0025-walk-the-filesystem-once-with-prune-and-checkpoint-it.md) | Walk the filesystem once, with -prune, and checkpoint it | Accepted |
+| [0025](./0025-walk-the-filesystem-once-with-prune-and-checkpoint-it.md) | Walk the filesystem once, with -prune, and checkpoint it | Accepted; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) |
 | [0026](./0026-2-0-0-is-one-binary-built-against-a-conformance-corpus.md) | 2.0.0 is one binary, built against a conformance corpus | Accepted |
 | [0027](./0027-development-and-testing-happen-in-a-container.md) | Development and testing happen in a container | Accepted |
 | [0028](./0028-the-documentation-site-is-astro-starlight.md) | The documentation site is Astro Starlight, on a Node toolchain | Superseded by 0055 |
@@ -56,7 +56,7 @@ If you disagree with one, open an issue and quote its number.
 | [0038](./0038-windows-is-read-through-the-same-boundary-with-powershell-as-the-tool.md) | Windows is read through the same boundary, with PowerShell as the tool | Accepted |
 | [0039](./0039-the-shell-machine-check-is-removed-and-the-corpus-holds-one-engine.md) | The shell machine check is removed, and the corpus holds one engine | Accepted |
 | [0040](./0040-indicators-are-matched-through-escape-codes-as-well.md) | Indicators are matched through escape codes as well | Accepted |
-| [0041](./0041-package-names-are-read-from-manifests-and-compared-whole.md) | Package names are read from manifests and compared whole | Proposed |
+| [0041](./0041-package-names-are-read-from-manifests-and-compared-whole.md) | Package names are read from manifests and compared whole | Proposed; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) |
 | [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed |
 | [0043](./0043-packages-use-layouts-the-binary-already-searches-and-are-bumped-by-pull-request.md) | Package in layouts the binary already searches, and bump by pull request | Accepted |
 | [0044](./0044-a-guided-session-ends-on-what-it-came-to-and-offers-the-next-check.md) | End a guided session on what it came to, and offer the next check | Accepted |
@@ -76,6 +76,7 @@ If you disagree with one, open an issue and quote its number.
 | [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
 | [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
 | [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
+| [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 
 ## Adding one

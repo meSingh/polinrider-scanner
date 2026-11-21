@@ -732,7 +732,8 @@ pub fn fonts(walk: &Walk, ind: &Indicators, v: &mut Verdict, sink: &mut Sink) {
 }
 
 /// Campaign packages a project installs, read out of its manifests and
-/// lockfiles by name (ADR-0041). A name inside a longer one, or in a
+/// lockfiles by name (ADR-0041), and hijacked releases of real packages, by
+/// name and version (ADR-0063). A name inside a longer one, or in a
 /// description, is not a dependency on it.
 pub fn packages(walk: &Walk, ind: &Indicators, v: &mut Verdict) {
     v.section("Known-bad packages");
@@ -783,13 +784,101 @@ pub fn packages(walk: &Walk, ind: &Indicators, v: &mut Verdict) {
                 )));
             }
         }
+        let releases = ind.manifest_releases(name, &body);
+        if !releases.is_empty() {
+            found = true;
+            hijacked(v, path, &releases);
+        }
+    }
+
+    // node_modules is never walked (ADR-0025). What it has installed is
+    // read from a few files by name.
+    for dir in &walk.node_modules {
+        for (path, releases) in installed_releases(dir, ind) {
+            found = true;
+            hijacked(v, &path, &releases);
+        }
     }
 
     if !found {
         v.push(Finding::ok(
-            "no known-bad package names in manifests or lockfiles",
+            "no known-bad package names or releases in manifests or lockfiles",
         ));
     }
+}
+
+/// The finding for a file that resolves, pins or is a hijacked release.
+fn hijacked(v: &mut Verdict, path: &Path, releases: &[(String, String)]) {
+    for (name, version) in releases {
+        v.detail(format!("{name} {version}"));
+    }
+    v.push(
+        Finding::hit(
+            Kind::HijackedRelease,
+            format!("hijacked release of a real package installed: {}", path.display()),
+        )
+        .at(path)
+        .with_remedy(
+            "this release of a real package carries the payload. Change it to any other release, delete node_modules and the lockfile entry, reinstall.",
+        ),
+    );
+}
+
+/// The hijacked releases installed in one `node_modules`, each with the file
+/// that says so. Read by name, never walked: npm's own record of what it
+/// installed, each listed package's `package.json`, and pnpm's store folder
+/// for each listed release. The loader file itself is not read; the release
+/// is the proof. ADR-0063.
+fn installed_releases(dir: &Path, ind: &Indicators) -> Vec<(PathBuf, Vec<(String, String)>)> {
+    let mut out = Vec::new();
+    if ind.bad_releases.is_empty() {
+        return out;
+    }
+    let mut read = |path: PathBuf, file_name: &str| {
+        if let Ok(bytes) = fs::read(&path) {
+            let found = ind.manifest_releases(file_name, &String::from_utf8_lossy(&bytes));
+            if !found.is_empty() {
+                out.push((path, found));
+            }
+        }
+    };
+    read(dir.join(".package-lock.json"), "package-lock.json");
+    let mut names: Vec<&str> = ind.bad_releases.iter().map(|(n, _)| n.as_str()).collect();
+    names.sort_unstable();
+    names.dedup();
+    for name in names {
+        let path = name
+            .split('/')
+            .fold(dir.to_path_buf(), |p, part| p.join(part))
+            .join("package.json");
+        read(path, "package.json");
+    }
+    // pnpm keeps each release in .pnpm/<name, with / as +>@<version>, and a
+    // peer suffix after _ or ( when it has peers.
+    if let Ok(entries) = fs::read_dir(dir.join(".pnpm")) {
+        let mut folders: Vec<PathBuf> = entries.flatten().map(|e| e.path()).collect();
+        folders.sort();
+        for folder in folders {
+            let Some(entry) = folder.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            let hits: Vec<(String, String)> = ind
+                .bad_releases
+                .iter()
+                .filter(|(name, version)| {
+                    let stem = format!("{}@{version}", name.replace('/', "+"));
+                    entry.strip_prefix(stem.as_str()).is_some_and(|rest| {
+                        rest.is_empty() || rest.starts_with('_') || rest.starts_with('(')
+                    })
+                })
+                .cloned()
+                .collect();
+            if !hits.is_empty() {
+                out.push((folder, hits));
+            }
+        }
+    }
+    out
 }
 
 /// The git hook check, one `.git` directory at a time, so a scan can read

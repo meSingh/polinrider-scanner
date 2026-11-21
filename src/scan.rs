@@ -533,6 +533,7 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
     let strippable = count(|k| matches!(k, Kind::Config { strippable: true }));
     let not_strippable = count(|k| matches!(k, Kind::Config { strippable: false }));
     let packages = count(|k| matches!(k, Kind::Package));
+    let releases = count(|k| matches!(k, Kind::HijackedRelease));
     let by_hand = count(|k| matches!(k, Kind::StartupFile));
     let cleaning = run.command == "clean";
 
@@ -627,6 +628,13 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
                     "the manifests"
                 }
             ),
+            None,
+        );
+    }
+    if releases > 0 {
+        step(
+            &mut out,
+            "Change each hijacked package named above to another release: pin any other release, delete node_modules and reinstall.",
             None,
         );
     }

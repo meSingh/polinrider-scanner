@@ -56,6 +56,9 @@ pub enum Kind {
     TasksJson,
     /// A campaign package named in a manifest.
     Package,
+    /// A hijacked release of a real package, resolved in a lockfile, pinned
+    /// in a manifest or installed in `node_modules`. ADR-0063.
+    HijackedRelease,
     /// A git hook carrying an indicator.
     GitHook,
     /// The second-stage implant, on disk.
@@ -105,6 +108,7 @@ impl Kind {
                 | Kind::FakeFont
                 | Kind::TasksJson
                 | Kind::Package
+                | Kind::HijackedRelease
                 | Kind::NamedFile
         )
     }
@@ -158,6 +162,10 @@ impl Kind {
             Kind::Package => (
                 "project that depends on a campaign package",
                 "projects that depend on a campaign package",
+            ),
+            Kind::HijackedRelease => (
+                "project that installs a hijacked release of a real package",
+                "projects that install a hijacked release of a real package",
             ),
             Kind::GitHook => (
                 "git hook carrying the payload",
@@ -245,6 +253,7 @@ impl Kind {
             | Kind::FakeFont
             | Kind::TasksJson
             | Kind::Package
+            | Kind::HijackedRelease
             | Kind::NamedFile => "A file in a project",
         }
     }

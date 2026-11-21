@@ -9,7 +9,9 @@
 //! `node_modules` is not walked at all. Campaign packages are caught by name
 //! from manifests and lockfiles, and the payload lives in the project's own
 //! config files and fonts rather than inside a dependency. That is a real
-//! limitation, recorded in ADR-0025 and pinned by a conformance case.
+//! limitation, recorded in ADR-0025 and pinned by a conformance case. Each
+//! `node_modules` is listed, so that a hijacked release installed in it can
+//! be found by reading a few named files (ADR-0063).
 
 use std::fs;
 use std::io;
@@ -43,6 +45,10 @@ pub struct Walk {
     /// entered, so the startup files in their site-packages can still be
     /// read without walking every installed package.
     pub python_envs: Vec<PathBuf>,
+    /// `node_modules` directories, listed but never entered, so the few files
+    /// that say which releases are installed can be read by name without
+    /// walking every package. ADR-0063.
+    pub node_modules: Vec<PathBuf>,
     /// Roots that did not exist or could not be read. Reported rather than
     /// skipped silently: scanning nothing must not look like scanning clean.
     pub unreadable: Vec<PathBuf>,
@@ -173,6 +179,7 @@ pub fn walk_seeing(roots: &[PathBuf], options: &Options, see: &mut dyn FnMut(See
     out.files.sort();
     out.git_dirs.sort();
     out.python_envs.sort();
+    out.node_modules.sort();
     out
 }
 
@@ -204,11 +211,10 @@ fn descend(dir: &Path, out: &mut Walk, options: &Options, see: &mut dyn FnMut(Se
                 continue;
             }
             if options.excludes(&path) {
-                if matches!(
-                    path.file_name().and_then(|n| n.to_str()),
-                    Some(".venv" | "venv")
-                ) {
-                    out.python_envs.push(path);
+                match path.file_name().and_then(|n| n.to_str()) {
+                    Some(".venv" | "venv") => out.python_envs.push(path),
+                    Some("node_modules") => out.node_modules.push(path),
+                    _ => {}
                 }
                 continue;
             }
@@ -323,6 +329,8 @@ mod tests {
             "{names:?}"
         );
         assert!(!names.iter().any(|n| n.contains(".cache")), "{names:?}");
+        // Listed, never entered, so its install record can be read by name.
+        assert_eq!(w.node_modules, [root.join("proj/node_modules")]);
         let _ = fs::remove_dir_all(&root);
     }
 

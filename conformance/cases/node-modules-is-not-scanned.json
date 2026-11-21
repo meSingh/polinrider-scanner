@@ -1,5 +1,5 @@
 {
-  "why": "ADR-0004 and ADR-0025: node_modules is pruned, so a payload living only there is invisible to the content scan. This case exists to make that limitation explicit and deliberate, not to assert it is desirable.",
+  "why": "ADR-0004 and ADR-0025: node_modules is pruned, so a payload living only there is invisible to the content scan. This case exists to make that limitation explicit and deliberate, not to assert it is desirable. From 3.2 a hijacked release is read by name from node_modules (its package.json, npm's .package-lock.json, pnpm's .pnpm folder; ADR-0063); nothing else inside it is read.",
   "roots": [
     "code"
   ],
