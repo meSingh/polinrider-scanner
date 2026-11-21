@@ -1,0 +1,614 @@
+---
+// The GitHub action's own page, the one its repository and Marketplace
+// listing link to. For a team that wants every push and pull request
+// checked so the payload cannot come back after a cleanup. The home page's
+// furniture: the hero, numbered steps, the ticked panel and a copyable
+// workflow. Every fact is from the action's README and action.yml (the
+// action/ submodule) and ADR-0062; the detail is in the docs under
+// /docs/action/. The pin is the v1.0.0 tag's commit; move it with each
+// release of the action.
+import Base from '../layouts/Base.astro';
+import Crumbs from '../components/Crumbs.astro';
+import Icon from '../components/Icon.astro';
+import PageFoot from '../components/PageFoot.astro';
+import { Code } from 'astro:components';
+import { abs, breadcrumbs } from '../schema';
+import { articlePath } from '../categories.mjs';
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const d = `${base}/docs/action`;
+const url = abs(Astro.url.pathname);
+const themes = { light: 'github-light-default', dark: 'github-dark-default' } as const;
+
+const ACTION_VERSION = 'v1.0.0';
+const ACTION_SHA = '8c71848593f0e58416c5f61845b3bd2e8080d438';
+const POLINRIDER_VERSION = '3.2.0';
+const MARKETPLACE = 'https://github.com/marketplace/actions/polinrider-scanner';
+const REPOSITORY = 'https://github.com/meSingh/polinrider-action';
+const announcement = `${base}${articlePath('2026-11-21-github-action', { category: 'announcements' })}`;
+
+const workflow = `name: PolinRider
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: meSingh/polinrider-action@${ACTION_SHA} # ${ACTION_VERSION}`;
+
+const steps = [
+  {
+    title: 'Downloads polinrider and checks it',
+    text: 'It fetches the release archive for the runner and compares its SHA-256 with the hash written into the action. An archive that does not match is never unpacked.',
+  },
+  {
+    title: 'Scans the checkout',
+    html: 'It runs <code>polinrider check --fs-only</code> on your repository with an empty home directory, so the verdict is about the repository and not the runner.',
+  },
+  {
+    title: 'Reports where you look',
+    text: 'A summary on the run, a note on each file it flags and, if you turn them on, a pull request comment and code scanning alerts.',
+  },
+  {
+    title: 'Fails the check when it should',
+    text: 'A confirmed finding fails it. A scan that could not run always fails, because a scan that did not finish is never a clean result.',
+  },
+];
+
+const differences = [
+  {
+    title: 'The same engine as on your laptop',
+    text: 'It runs the released polinrider binary with its indicators, so CI gives the verdict you would get at your desk. There is no second signature list to fall behind.',
+  },
+  {
+    title: 'Pinned by hash',
+    html: 'The polinrider version and the SHA-256 of every archive are written into <code>action.yml</code>. Anything that does not match is refused.',
+  },
+  {
+    title: 'Fix mode only opens a pull request',
+    text: 'It never commits to the branch it scanned, never force-pushes and never merges. A person reviews the fix.',
+  },
+  {
+    title: 'Tags never move',
+    text: 'Release tags are protected and cannot be changed or deleted, and the setup pins the full commit SHA anyway.',
+  },
+  {
+    title: 'Read-only by default',
+    html: 'Check mode needs <code>contents: read</code>. The scan step never sees a token.',
+  },
+  {
+    title: 'Small enough to read',
+    text: 'Bash, curl and tar. No npm and no other action inside it.',
+  },
+];
+
+const more = [
+  { label: 'Set up the action', href: `${d}/setup/`, text: 'the workflow, the pin, Dependabot, a required check' },
+  { label: 'Inputs, outputs and permissions', href: `${d}/inputs/`, text: 'every setting, and what each mode needs' },
+  { label: 'Fix mode', href: `${d}/fix-mode/`, text: 'the pull request it opens, and when it opens none' },
+  { label: 'Reading the results', href: `${d}/results/`, text: 'the summary, file notes and code scanning' },
+  { label: 'What the action trusts', href: `${d}/trust/`, text: 'how to check it, and the alternative' },
+  { label: 'The action on the GitHub Marketplace', href: MARKETPLACE, text: 'its listing' },
+  { label: 'The action’s repository on GitHub', href: REPOSITORY, text: 'its code, releases and README' },
+  { label: 'Announcement', href: announcement, text: 'a GitHub action that stops PolinRider coming back' },
+];
+
+const schema = [
+  breadcrumbs([], 'GitHub action', url),
+  {
+    '@type': 'WebPage',
+    '@id': `${url}#page`,
+    url,
+    name: 'PolinRider Scanner GitHub action',
+    about: { '@type': 'SoftwareSourceCode', name: 'PolinRider Scanner action', codeRepository: REPOSITORY, license: 'https://opensource.org/licenses/MIT' },
+  },
+];
+---
+
+<Base
+  title="GitHub action"
+  titleTag="PolinRider Scanner GitHub action: block PolinRider on every push"
+  description="A free GitHub action that scans every push and pull request for PolinRider with the same binary and indicators as the laptop tool, pinned by SHA-256."
+  type="website"
+  schema={schema}
+>
+  <div class="wrap crumbs-row"><Crumbs items={[]} /></div>
+
+  <section class="hero wrap">
+    <p class="kicker">Free GitHub action, MIT licence</p>
+    <h1>Keep PolinRider out of your repository.<br /><span class="accent">Check every push and pull request.</span></h1>
+    <p class="tagline">
+      The PolinRider Scanner action runs the same polinrider program and indicators you run on a laptop, on every
+      push, every pull request and once a week. A confirmed finding fails the check, so an infected change cannot
+      merge.
+    </p>
+    <div class="ctas">
+      <a class="btn primary" href={MARKETPLACE}><Icon name="ci" size={18} />Get it on the Marketplace</a>
+      <a class="btn" href={REPOSITORY}><Icon name="repo" size={18} />View on GitHub</a>
+      <a class="btn" href={`${d}/setup/`}><Icon name="doc" size={18} />Read the docs</a>
+    </div>
+    <p class="hero-foot small">
+      {ACTION_VERSION} runs polinrider {POLINRIDER_VERSION}. Linux and macOS runners.
+    </p>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="who-h">
+    <h2 id="who-h">Who it is for</h2>
+    <p>
+      A team that has cleaned up PolinRider and wants to be sure it stays gone. The payload comes back through any
+      computer that is still infected and still holds a valid token: it amends the latest commit and force-pushes
+      it. With the action as a required check, that push shows up as a red cross the moment it lands.
+    </p>
+    <p>
+      It suits a team that has not been hit too. One infected laptop is enough, and the check costs two lines of
+      YAML.
+    </p>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="what-h">
+    <h2 id="what-h">What it does</h2>
+    <ol class="steps">
+      {steps.map((s, i) => (
+        <li>
+          <span class="n" aria-hidden="true">{i + 1}</span>
+          <div class="step">
+            <h3>{s.title}</h3>
+            {s.html ? <p set:html={s.html} /> : <p>{s.text}</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  </section>
+
+  <section class="wrap block" aria-labelledby="diff-h">
+    <div class="safe-panel">
+      <div class="safe-intro">
+        <p class="eyebrow">Before you add it</p>
+        <h2 id="diff-h">How it differs</h2>
+        <p>
+          A scan step runs on every push, with your code in front of it. So it should run the program you already
+          trust, refuse anything it cannot verify and never change your branch behind your back.
+        </p>
+      </div>
+      <ul class="guarantees">
+        {differences.map((g) => (
+          <li>
+            <span class="tick" aria-hidden="true"><Icon name="clean" size={22} /></span>
+            <span><strong>{g.title}</strong>{g.html ? <span set:html={g.html} /> : g.text}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="start-h">
+    <h2 id="start-h">Quick start</h2>
+    <p>Add <code>.github/workflows/polinrider.yml</code>:</p>
+    <div class="code-block copy-wrap">
+      <Code code={workflow} lang="yaml" themes={themes} defaultColor={false} />
+    </div>
+    <p>Then, so it does not come back:</p>
+    <ol class="plain">
+      <li>
+        <strong>Make <code>scan</code> a required check</strong> on your default branch, in Settings, Rules,
+        Rulesets.
+      </li>
+      <li><strong>Keep the weekly schedule.</strong> It scans code nobody has touched with the newest indicators.</li>
+      <li>
+        <strong>Let Dependabot move the pin.</strong> Each polinrider release becomes a release of the action, and
+        Dependabot opens a pull request for it.
+      </li>
+    </ol>
+    <p class="textlink-row">
+      <a class="textlink" href={`${d}/setup/`}>Set up the action, step by step <Icon name="arrow" size={16} /></a>
+    </p>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="runners-h">
+    <h2 id="runners-h">Runners</h2>
+    <table class="runners">
+      <tbody>
+        <tr>
+          <th scope="row">Linux: <code>ubuntu-latest</code>, <code>ubuntu-24.04</code>, x86_64 and arm64</th>
+          <td>Supported. Needs glibc 2.39, so not <code>ubuntu-22.04</code></td>
+        </tr>
+        <tr>
+          <th scope="row">macOS</th>
+          <td>Supported</td>
+        </tr>
+        <tr>
+          <th scope="row">Windows</th>
+          <td>Not yet. The step fails and says so</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="trust-h">
+    <h2 id="trust-h">What it trusts</h2>
+    <p>
+      Three things: the action's repository at the SHA you pin, the polinrider release on GitHub and the hashes in
+      <code>action.yml</code>. You can check all three yourself. If you would rather trust nothing fetched while the
+      scan runs, there is a copy of the scanner you keep in your own repository instead.
+    </p>
+    <p class="textlink-row">
+      <a class="textlink" href={`${d}/trust/`}>What the action trusts <Icon name="arrow" size={16} /></a>
+      <a class="textlink" href={`${base}/docs/guides/ci/`}>Compare it with the vendored copy <Icon name="arrow" size={16} /></a>
+    </p>
+  </section>
+
+  <section class="wrap col block" aria-labelledby="more-h">
+    <h2 id="more-h">Read more</h2>
+    <ul class="more">
+      {more.map((m) => (
+        <li>
+          <a href={m.href}>{m.label}</a>
+          <span>{m.text}</span>
+        </li>
+      ))}
+    </ul>
+    <PageFoot file="src/pages/github-action.astro" />
+  </section>
+</Base>
+
+<style>
+  code {
+    padding: 0.05em 0.35em;
+    border: 1px solid var(--pr-border);
+    border-radius: 6px;
+    background: var(--pr-surface);
+    color: var(--pr-heading);
+    font-size: 0.88em;
+  }
+  h2 {
+    margin: 0;
+    font-size: clamp(1.625rem, 1.2rem + 1.4vw, 2.125rem);
+    letter-spacing: -0.025em;
+  }
+  .small {
+    color: var(--pr-muted);
+    font-size: var(--text-sm);
+  }
+  .crumbs-row {
+    padding-top: 1.5rem;
+  }
+  /* The column every section but the panel keeps, as on the home page. */
+  .col {
+    max-width: calc(56rem + 2 * var(--gutter));
+  }
+  .block {
+    margin-top: clamp(3rem, 7vw, 5rem);
+  }
+  .col p {
+    margin: 0.9rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+
+  /* Hero, as on the home page. */
+  .hero {
+    position: relative;
+    isolation: isolate;
+    overflow-x: clip;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-block: clamp(2rem, 6vw, 4rem) 0;
+    text-align: center;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    left: 50%;
+    width: min(60rem, 120vw);
+    height: 28rem;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at 50% 35%, var(--pr-glow), transparent 65%);
+    pointer-events: none;
+  }
+  .kicker {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    margin: 0 0 1.5rem;
+    color: var(--pr-muted);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+  }
+  .kicker::before,
+  .kicker::after {
+    content: '';
+    flex: none;
+    width: 2rem;
+    height: 1px;
+    background: var(--pr-border-strong);
+  }
+  @media (max-width: 30rem) {
+    .kicker {
+      display: block;
+      font-size: 0.75rem;
+    }
+    .kicker::before,
+    .kicker::after {
+      content: none;
+    }
+  }
+  h1 {
+    max-width: 24ch;
+    margin: 0;
+    font-size: clamp(2.25rem, 1.2rem + 4.2vw, 4rem);
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+  }
+  .accent {
+    color: var(--pr-accent);
+  }
+  .tagline {
+    max-width: 40rem;
+    margin: 1.25rem 0 0;
+    font-size: clamp(1.125rem, 1rem + 0.5vw, 1.3125rem);
+    line-height: 1.5;
+    text-wrap: balance;
+  }
+  .ctas {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.625rem;
+    margin-top: 2rem;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 1.05rem;
+    border: 1px solid var(--pr-border-strong);
+    border-radius: 999px;
+    background: var(--pr-bg);
+    color: var(--pr-heading);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.3;
+    text-decoration: none;
+  }
+  .btn :global(svg) {
+    flex: none;
+  }
+  .btn:hover {
+    border-color: var(--pr-heading);
+    color: var(--pr-heading);
+  }
+  .btn.primary {
+    border-color: var(--pr-pill-bg);
+    background: var(--pr-pill-bg);
+    color: var(--pr-pill-text);
+  }
+  .btn.primary:hover {
+    color: var(--pr-pill-text);
+    opacity: 0.88;
+  }
+  @media (max-width: 40rem) {
+    .ctas {
+      flex-direction: column;
+      width: min(100%, 20rem);
+    }
+    .btn {
+      justify-content: center;
+    }
+  }
+  .hero-foot {
+    margin: 1.5rem 0 0;
+  }
+
+  /* What it does: the home page's numbered steps. */
+  .steps {
+    margin: 2rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .steps > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    gap: 0 1.25rem;
+    padding-bottom: 2rem;
+  }
+  .steps > li::after {
+    content: '';
+    position: absolute;
+    top: 2.75rem;
+    bottom: 0.5rem;
+    left: 1.25rem;
+    width: 1px;
+    background: var(--pr-border);
+  }
+  .steps > li:last-child {
+    padding-bottom: 0;
+  }
+  .steps > li:last-child::after {
+    display: none;
+  }
+  .n {
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--pr-accent);
+    border-radius: 50%;
+    background: var(--pr-accent-bg);
+    color: var(--pr-accent);
+    font-weight: 700;
+  }
+  .step {
+    min-width: 0;
+  }
+  .step h3 {
+    margin: 0.4rem 0 0;
+    font-size: 1.25rem;
+  }
+  .step p {
+    margin-top: 0.5rem;
+  }
+
+  /* How it differs: the home page's ticked panel. */
+  .safe-panel {
+    display: grid;
+    gap: 2rem;
+    padding: clamp(1.5rem, 4vw, 2.5rem);
+    border: 1px solid var(--pr-clean-border);
+    border-radius: calc(var(--pr-radius) + 6px);
+    background: var(--pr-clean-bg);
+  }
+  @media (min-width: 60rem) {
+    .safe-panel {
+      grid-template-columns: 2fr 3fr;
+      gap: 3rem;
+    }
+  }
+  .safe-intro p {
+    margin: 0.9rem 0 0;
+  }
+  .guarantees {
+    display: grid;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .guarantees li {
+    display: flex;
+    gap: 0.9rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--pr-clean-border);
+  }
+  .guarantees li:first-child {
+    padding-top: 0;
+  }
+  .guarantees li:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .tick {
+    flex: none;
+    color: var(--pr-clean);
+  }
+  .guarantees strong {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: var(--pr-heading);
+    font-size: 1.0625rem;
+  }
+
+  /* Quick start */
+  .code-block {
+    margin-top: 1rem;
+  }
+  .code-block :global(pre) {
+    margin: 0;
+    padding: 1rem 6.5rem 1rem 1.25rem;
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius);
+    background: var(--pr-code-bg) !important;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .code-block :global(.copy-btn) {
+    opacity: 1;
+  }
+  .plain {
+    margin: 0.75rem 0 0;
+    padding-inline-start: 1.5rem;
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+  .plain li + li {
+    margin-top: 0.5rem;
+  }
+  .textlink-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.75rem;
+    font-weight: 600;
+  }
+  .textlink {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  /* Runners */
+  .runners {
+    width: 100%;
+    margin-top: 1.25rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--pr-border);
+    border-radius: var(--pr-radius);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  .runners th,
+  .runners td {
+    padding: 0.85rem 0.9rem;
+    border-bottom: 1px solid var(--pr-border);
+    text-align: start;
+    vertical-align: top;
+  }
+  .runners th {
+    width: 50%;
+    color: var(--pr-heading);
+    font-weight: 600;
+  }
+  .runners tr:last-child > * {
+    border-bottom: 0;
+  }
+  @media (max-width: 40rem) {
+    .runners th,
+    .runners td {
+      display: block;
+      width: auto;
+    }
+    .runners th {
+      border-bottom: 0;
+      padding-bottom: 0.2rem;
+    }
+  }
+
+  /* Read more */
+  .more {
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--pr-border);
+  }
+  .more li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.75rem;
+    align-items: baseline;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--pr-border);
+  }
+  .more a {
+    font-weight: 600;
+  }
+  .more span {
+    color: var(--pr-muted);
+    font-size: var(--text-sm);
+  }
+</style>
