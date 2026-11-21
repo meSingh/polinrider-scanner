@@ -1,0 +1,59 @@
+---
+title: PolinRider Scanner and Cleaner 3.3.0
+description: Reads each repository's git history, so a payload that a git restore would bring back is found. Faster on large drives, and fewer harmless review lines.
+version: "3.3.0"
+# The expected release day. Once the tag exists the site shows the tag's date
+# instead, so this never needs correcting after the release.
+date: "2026-11-22"
+---
+
+import Downloads from '~/components/Downloads.astro';
+import Released from '~/components/Released.astro';
+import RunBlock from '~/components/RunBlock.astro';
+
+<Released version="3.3.0" date="2026-11-22" /> No breaking changes.
+
+## New
+
+- **Git history is read.** A check of a 932 GB backup drive found every working
+  file clean while git still held the payload in 47 repositories. In three of
+  them the last commit carried it, so one `git restore` would have put it back.
+  Each repository the check finds is now read too: the last commit, the staged
+  files, every branch and tag, and every stash, bare repositories included.
+  What git still holds is confirmed, with the place named and the advice to
+  commit the cleaned files before any restore. `--git-all` also reads every
+  earlier commit. Git is read, never changed.
+- **A pipe or a log hears from a long step.** About once a minute it prints that
+  the step is still running and how far it has come.
+
+## Changed
+
+- **Faster on large drives.** Each project file is opened once, and a file that
+  is not text is read only to its first 8 KB.
+- **Fewer harmless review lines.** The hooks git-lfs, husky and yorkie write,
+  and the Python startup files coloredlogs, setuptools and virtualenv install,
+  are recognised and no longer listed for review. Generated Nuxt files are not
+  reviewed for long lines, and a `.d.ts` file is not treated as a build config.
+  A payload in any of them is still confirmed.
+- **`--fs-only` reads no home folder** unless you name one with `--home`. It
+  used to read the home of the user running it.
+- **`--fresh` is accepted with `--apply`.** A check that moves files always
+  starts from the beginning anyway.
+
+## Breaking changes
+
+None. Exit codes, commands and flags are as in the previous release. A folder
+that 3.2.0 called clean can now come back as infected, exit 2, when its git
+history holds the payload: that is the history being read, not a change to
+what the exit codes mean.
+
+## Download
+
+<Downloads version="3.3.0" packages />
+
+Or use a package manager. Choose your system, then run only its commands:
+
+<RunBlock />
+
+[Verify what you downloaded](/docs/reference/verifying/) before
+you run it.

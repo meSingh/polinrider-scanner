@@ -25,7 +25,8 @@ polinrider check ~/code
 A check of this computer and of that folder. It moves nothing. Add `--apply`
 to move confirmed artifacts into quarantine. `--fs-only` checks the folder
 alone and reads nothing of the machine, which is what you want for a backup
-drive or a mounted image.
+drive or a mounted image. It reads no home folder either, unless you name one
+with `--home`.
 
 ## What it looks at
 
@@ -76,6 +77,27 @@ single version. Only that version is reported, from the lockfile or from the
 installed copy in `node_modules`, and the advice is to change to any other
 release and reinstall. Other releases of the same package are not reported.
 
+## Git history
+
+Cleaning the files on disk is not enough when git still has a copy. A
+`git restore`, `reset`, `checkout` or `stash pop` puts the payload back. So
+each git repository the check finds is read as well: the last commit, the
+staged files, every branch and tag, and every stash. Bare repositories, such
+as a backup kept from a history rewrite, are read the same way.
+
+- A payload that git still holds is confirmed, and the report names each place:
+  the last commit, a branch, a tag or a stash, and the file.
+- The advice is to commit the cleaned files before any restore, reset or
+  checkout, then delete or rewrite each branch and stash named. Delete a bare
+  backup that holds the payload, or keep it offline and labelled.
+- Git is read, never changed, and a repository's own git settings cannot make
+  git run a program during the check.
+- Each repository gets at most two minutes; one that takes longer is listed
+  for review. `--git-all` also reads every earlier commit and object, with no
+  time limit.
+- If git is not installed, the report says the history was not read. It is
+  never passed over in silence.
+
 ## What changes, and when
 
 Nothing is ever deleted.
@@ -86,7 +108,8 @@ Nothing is ever deleted.
 - `polinrider clean DIR --apply` does that and one thing more: where the
   payload was appended to a build config, it cuts the payload out in place and
   keeps the infected original in quarantine. Your own uncommitted work in that
-  file survives. It does not touch git.
+  file survives. It never changes git, and it says when git still holds the
+  payload.
 - A crontab line, a shell startup file, a PowerShell profile, a Run entry and
   a scheduled task are never changed for you. The finding carries the command
   that removes it.
@@ -132,6 +155,9 @@ never asks: it starts again and says how to continue.
 A check is continued only when it was made by the same version, with the same
 indicators, folders and options. Otherwise it starts from the beginning and
 says why. `clean` and `check --apply` always start from the beginning.
+
+Into a pipe or a log, a long step prints a line about once a minute to say it
+is still running and how far it has come.
 
 ## Exit codes
 
