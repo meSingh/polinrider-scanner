@@ -50,7 +50,17 @@ export const groups: { label: string; items: [string, string][] }[] = [
       ['guides/organization', 'An organization'],
     ],
   },
-  { label: 'Keep it out', items: [['guides/ci', 'Every future push']] },
+  {
+    label: 'Keep it out',
+    items: [
+      ['guides/ci', 'Every future push'],
+      ['action/setup', 'Set up the GitHub action'],
+      ['action/inputs', 'Inputs and permissions'],
+      ['action/fix-mode', 'Fix mode'],
+      ['action/results', 'Reading the results'],
+      ['action/trust', 'What the action trusts'],
+    ],
+  },
   {
     label: 'The project',
     items: [

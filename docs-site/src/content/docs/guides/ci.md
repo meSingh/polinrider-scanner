@@ -37,31 +37,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: meSingh/polinrider-action@<sha> # v1.0.0
+      - uses: meSingh/polinrider-action@8c71848593f0e58416c5f61845b3bd2e8080d438 # v1.0.0
 ```
 
-Pin the action by its full commit SHA, not a tag, and let Dependabot move the
-pin: each scanner release becomes a release of the action with the new
-version and hashes. Then make the `scan` check required on your default
-branch, so an infected push or pull request cannot merge. The weekly
-`schedule:` picks up new indicators in code nobody has touched.
+Then make `scan` a required check and let Dependabot move the pin.
 
-The action downloads the archive for the runner, hashes it, refuses one that
-does not match the hash it pins and runs `polinrider check --fs-only` on the
-checkout. A confirmed finding fails the check; `fail-on: review` also fails
-on a finding to review and `fail-on: never` only reports. A scan that could
-not run always fails. The job summary lists each finding and what to do next,
-and each one is annotated on its file.
+It runs the released `polinrider` binary on the checkout and fails the check
+on a confirmed finding. `mode: fix` opens a pull request that removes the
+payload; it never commits to the branch it scanned. Linux runners need
+`ubuntu-24.04` or later.
 
-`mode: fix` (with `contents: write` and `pull-requests: write`) runs
-`polinrider clean --apply` on the checkout and opens a pull request with the
-cleaned files. It never commits to the branch it scanned, never force-pushes,
-never merges and does nothing on a pull request from a fork. The
-[action's README](https://github.com/meSingh/polinrider-action#readme) has
-every input, the permissions per mode, code scanning and comments.
-
-The Linux binaries need glibc 2.39 or later: use `ubuntu-latest` or
-`ubuntu-24.04`, not `ubuntu-22.04`.
+- [Set up the GitHub action](/docs/action/setup/): the pin, Dependabot, a
+  required check, the weekly scan
+- [Inputs, outputs and permissions](/docs/action/inputs/)
+- [Fix mode](/docs/action/fix-mode/)
+- [Reading the results](/docs/action/results/)
+- [What the action trusts](/docs/action/trust/)
 
 ## The vendored copy
 
