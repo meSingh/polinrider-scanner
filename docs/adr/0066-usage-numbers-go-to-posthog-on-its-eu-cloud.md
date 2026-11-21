@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; host amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
 | **Date** | 2026-11-21 |
 
 ## Context

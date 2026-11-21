@@ -79,7 +79,8 @@ If you disagree with one, open an issue and quote its number.
 | [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
 | [0064](./0064-editor-and-app-startup-files-are-read-at-their-install-paths.md) | Editor and app startup files are read at their install paths | Accepted |
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
-| [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted |
+| [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted; amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
+| [0067](./0067-the-posthog-project-is-on-its-us-cloud.md) | The PostHog project is on PostHog's US cloud | Accepted |
 
 ## Adding one
 

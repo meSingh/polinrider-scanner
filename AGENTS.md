@@ -367,7 +367,7 @@ descending. That was the six-hour scan ([ADR-0025](./docs/adr/0025-walk-the-file
 | DNS for both domains | Cloudflare | `polinriderscanner.com`: GitHub Pages records, DNS only, plus the TXT records that verify it to GitHub, Google and Bing. `polinrider.com`: a proxied placeholder (`AAAA 100::`) and a Single Redirect rule, a 301 from every path on the apex and `www` to `https://polinriderscanner.com/what-is-polinrider/` |
 | The old name | `meSingh/polinrider-cleaner` | The repository's name until 3.0.0; GitHub redirects it here. **Never create a repository with that name.** Doing so ends every redirect, including the links in releases before 3.0.0 and in the commits, pull requests and issues the tool has opened on other people's repositories (ADR-0057) |
 | Traffic log | `traffic` branch, from `.github/workflows/traffic.yml` | Views, clones, referrers, paths and stars, daily, kept past GitHub's 14 days. Needs the `TRAFFIC_TOKEN` secret: a fine-grained token with Administration: read on this repository, and on the tap, the bucket and the action to record theirs under `repos/`; it also counts the action's users by code search. Release downloads per week, with our own taken off, under `downloads/` on the same branch; that part needs only the workflow token. See "The download history" and "Usage numbers in PostHog" below |
-| Usage numbers | PostHog, EU cloud, one project | The site's page views and clicks, and a copy of the traffic log's numbers. The site's key is the `PUBLIC_POSTHOG_KEY` repository variable, the traffic log's the `POSTHOG_PROJECT_KEY` secret: the same project key. Cookieless tracking must be on in the project. See "Usage numbers in PostHog" below |
+| Usage numbers | PostHog, US cloud, one project | The site's page views and clicks, and a copy of the traffic log's numbers. The site's key is the `PUBLIC_POSTHOG_KEY` repository variable, the traffic log's the `POSTHOG_PROJECT_KEY` secret: the same project key. Cookieless tracking must be on in the project. See "Usage numbers in PostHog" below |
 
 ### Cutting a release
 
@@ -605,7 +605,8 @@ and the winget manifest check used `gh release download` and are not in it.
 ### Usage numbers in PostHog
 
 The site's visits and GitHub's numbers are read in one PostHog project, on
-its EU cloud (ADR-0066). The `traffic` branch stays the permanent record:
+its US cloud (ADR-0066, ADR-0067). A 200 from PostHog does not prove an event
+arrived: check the project's events list after any change of key or host. The `traffic` branch stays the permanent record:
 PostHog holds a copy, and can be replaced or emptied without losing
 anything GitHub reported.
 
