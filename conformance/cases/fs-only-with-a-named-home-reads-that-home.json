@@ -1,0 +1,27 @@
+{
+  "why": "A home named with --home is part of the disk the operator asked about, a backup's home for instance, so --fs-only reads it: the campaign's SSH key there is confirmed and the file at the implant's install path is confirmed (ADR-0049, ADR-0069). The same home not named is not read; fs-only-without-home-reads-nothing-under-home pins that half. Paths from this machine's root, such as /tmp, are never read under --fs-only, named home or not.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {
+    ".ssh/authorized_keys": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOwnerOwnKeyAAAAAAAAAAAAAAAAAAAAAAAAAAAA owner@laptop\nssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCattackerKeyStandInAAAAAAAAAAAAAAAAAAAA bink@DESKTOP-N8JGD6T\n",
+    ".local/share/MicrosoftSystem64": "stand-in for the implant binary\n"
+  },
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "an SSH key known from the campaign is allowed to log in (bink@DESKTOP-N8JGD6T)"
+      },
+      {
+        "level": "HIT",
+        "match": "implant artifact present"
+      }
+    ]
+  }
+}

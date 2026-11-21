@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Proposed |
+| **Status** | Proposed; amended by [ADR-0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) |
 | **Date** | 2026-10-13 |
 
 ## Context

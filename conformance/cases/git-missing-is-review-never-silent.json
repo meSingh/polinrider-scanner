@@ -1,0 +1,29 @@
+{
+  "why": "Without git the history of the repositories found cannot be read, and repositories not read are not repositories found clean. The run says how many were left unread, as a review line, and exits 1 rather than 0 (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "no_git": true,
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "README.txt": "shop\n"
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 1,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "review",
+        "match": "git is not installed, so the history of 1 git repository was not read"
+      }
+    ]
+  }
+}

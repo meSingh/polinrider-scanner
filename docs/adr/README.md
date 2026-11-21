@@ -46,7 +46,7 @@ If you disagree with one, open an issue and quote its number.
 | [0028](./0028-the-documentation-site-is-astro-starlight.md) | The documentation site is Astro Starlight, on a Node toolchain | Superseded by 0055 |
 | [0029](./0029-host-state-is-read-through-one-boundary-and-can-be-supplied.md) | Host state is read through one boundary, and can be supplied | Accepted |
 | [0030](./0030-2-0-does-not-checkpoint-a-scan.md) | 2.0 does not checkpoint a scan | Accepted; amended by [ADR-0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) and [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
-| [0031](./0031-clean-strips-an-appended-payload-in-place-and-never-touches-git.md) | clean strips an appended payload in place, and never touches git | Accepted |
+| [0031](./0031-clean-strips-an-appended-payload-in-place-and-never-touches-git.md) | clean strips an appended payload in place, and never touches git | Accepted; amended by [ADR-0068](./0068-local-git-history-is-read-with-the-disk-s-rules.md) |
 | [0032](./0032-the-guided-flow-changes-something-only-on-a-typed-yes.md) | The guided flow changes something only on a typed yes | Accepted |
 | [0033](./0033-every-run-opens-with-the-banner-and-colour-changes-no-character.md) | Every run opens with the banner, and colour changes no character | Accepted |
 | [0034](./0034-the-verdict-is-followed-by-what-to-do-and-rebuild-is-said-only-on-proof.md) | The verdict is followed by what to do, and "rebuild" is said only on proof | Accepted |
@@ -57,14 +57,14 @@ If you disagree with one, open an issue and quote its number.
 | [0039](./0039-the-shell-machine-check-is-removed-and-the-corpus-holds-one-engine.md) | The shell machine check is removed, and the corpus holds one engine | Accepted |
 | [0040](./0040-indicators-are-matched-through-escape-codes-as-well.md) | Indicators are matched through escape codes as well | Accepted |
 | [0041](./0041-package-names-are-read-from-manifests-and-compared-whole.md) | Package names are read from manifests and compared whole | Proposed; amended by [ADR-0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) |
-| [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed |
+| [0042](./0042-python-startup-files-and-npm-s-own-files-are-checked-as-persistence.md) | Python startup files and npm's own files are checked as persistence | Proposed; amended by [ADR-0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) |
 | [0043](./0043-packages-use-layouts-the-binary-already-searches-and-are-bumped-by-pull-request.md) | Package in layouts the binary already searches, and bump by pull request | Accepted |
 | [0044](./0044-a-guided-session-ends-on-what-it-came-to-and-offers-the-next-check.md) | End a guided session on what it came to, and offer the next check | Accepted |
 | [0045](./0045-small-files-the-checks-read-are-compared-by-hash.md) | Compare the small files the checks read against the known hashes | Accepted; amended by [ADR-0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) |
 | [0046](./0046-purge-evidence-deletes-only-polinriders-own-copies.md) | Let `--purge-evidence` delete polinrider's own copies, and nothing else | Accepted |
 | [0047](./0047-the-folder-and-computer-checks-read-weak-txt.md) | The folder and computer checks read `weak.txt` | Accepted |
 | [0048](./0048-a-review-level-filename-list.md) | Add a review-level filename list | Accepted |
-| [0049](./0049-the-computer-check-reads-authorized-keys.md) | The computer check reads `~/.ssh/authorized_keys` | Accepted |
+| [0049](./0049-the-computer-check-reads-authorized-keys.md) | The computer check reads `~/.ssh/authorized_keys` | Accepted; amended by [ADR-0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) |
 | [0050](./0050-a-node-process-running-the-implants-script-is-the-implant.md) | A `node` process running a script from the implant's folder is the implant | Accepted |
 | [0051](./0051-the-github-check-compares-known-hashes.md) | The GitHub check compares the small files against the known hashes | Accepted |
 | [0052](./0052-content-patterns-at-the-confirmed-tier.md) | Match campaign patterns in file contents | Accepted; its rule that a pattern match is not stripped is superseded by [ADR-0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) |
@@ -73,14 +73,19 @@ If you disagree with one, open an issue and quote its number.
 | [0056](./0056-the-docs-are-versioned-by-release-line.md) | Keep a frozen copy of the docs for each release line | Accepted |
 | [0057](./0057-the-repository-is-polinrider-scanner-from-3-0-0.md) | Rename the repository and its packages to polinrider-scanner, from 3.0.0 | Accepted |
 | [0058](./0058-the-var-z-and-global-i-tags-and-every-javascript-file.md) | Confirm the var z and global.i tags, and read every JavaScript file | Accepted |
-| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) |
-| [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
+| [0059](./0059-a-scan-goes-riskiest-first-saves-findings-as-found-and-hashes-only-programs.md) | A scan goes riskiest first, saves each finding as found and hashes only programs | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) and [ADR-0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) |
+| [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted; amended by [ADR-0071](./0071-fresh-is-accepted-with-apply.md) |
 | [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
 | [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
 | [0064](./0064-editor-and-app-startup-files-are-read-at-their-install-paths.md) | Editor and app startup files are read at their install paths | Accepted |
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 | [0066](./0066-usage-numbers-go-to-posthog-on-its-eu-cloud.md) | Send the site's and GitHub's usage numbers to PostHog, on its EU cloud | Accepted; amended by [ADR-0067](./0067-the-posthog-project-is-on-its-us-cloud.md) |
 | [0067](./0067-the-posthog-project-is-on-its-us-cloud.md) | The PostHog project is on PostHog's US cloud | Accepted |
+| [0068](./0068-local-git-history-is-read-with-the-disk-s-rules.md) | Read each local repository's history with the disk check's rules | Accepted |
+| [0069](./0069-fs-only-reads-a-home-only-when-it-is-named.md) | Under --fs-only, read a home only when it is named | Accepted |
+| [0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md) | Tell a pipe once a minute that a step is still running | Accepted |
+| [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |
+| [0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) | Know stock hooks and startup files by hash, and leave generated output out of the long-line review | Accepted |
 
 ## Adding one
 

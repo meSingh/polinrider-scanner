@@ -1236,7 +1236,7 @@ impl Mirror<'_> {
 
 /// The files whose hash is compared with `hashes.txt` at any size: the ones
 /// the local checks read whole. ADR-0045, ADR-0051.
-fn is_hash_candidate(path: &str) -> bool {
+pub(crate) fn is_hash_candidate(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
     let lower = name.to_ascii_lowercase();
     (name == "tasks.json"
@@ -1293,7 +1293,7 @@ fn is_fake_font(path: &str, bytes: &[u8]) -> bool {
 
 /// The first four bytes of a file that is named as a web font and is not
 /// one, in hexadecimal.
-fn fake_font_magic(path: &str, bytes: &[u8]) -> Option<String> {
+pub(crate) fn fake_font_magic(path: &str, bytes: &[u8]) -> Option<String> {
     let name = path.rsplit('/').next().unwrap_or(path);
     let lower = name.to_ascii_lowercase();
     let truetype = is_truetype_name(&lower);

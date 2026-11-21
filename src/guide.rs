@@ -633,6 +633,8 @@ fn local(
         ioc_dir: session.ioc_dir,
         ind: session.ind,
         home: (what == What::Computer).then_some(session.home),
+        home_read: true,
+        git_all: false,
         host: if what == What::Computer {
             session.host
         } else {
@@ -1470,6 +1472,17 @@ fn what_now(
         t.paths = paths_of(current, session.home, |k| k == Kind::HijackedRelease);
         todos.push(t);
     }
+    if kinds_now.contains(&Kind::GitHistory) {
+        let mut t = todo(
+            "Clean the git history the report names",
+            &[
+                "Git keeps a copy that a restore, reset or checkout puts back.",
+                "Commit the cleaned files, then delete or rewrite each branch named.",
+            ],
+        );
+        t.paths = paths_of(current, session.home, |k| k == Kind::GitHistory);
+        todos.push(t);
+    }
     if kinds_now.contains(&Kind::StartupFile) {
         let mut t = todo(
             "Edit your shell startup file",
@@ -1909,6 +1922,8 @@ mod tests {
             ioc_dir: &w.dir.join("ioc"),
             ind: &ind,
             home: None,
+            home_read: true,
+            git_all: false,
             host: None,
             on_infected_config: OnInfectedConfig::Report,
             report: None,
@@ -1921,7 +1936,9 @@ mod tests {
                 scan::Event::Started(n) => format!("start {n}"),
                 scan::Event::Done(n, _) => format!("done {n}"),
                 scan::Event::Found(f) => format!("found {}", f.what()),
-                scan::Event::Count { .. } | scan::Event::Save { .. } => return,
+                scan::Event::Count { .. }
+                | scan::Event::Repos { .. }
+                | scan::Event::Save { .. } => return,
             });
         });
         // The config is a step 1 file, so it is found in step 1, before the

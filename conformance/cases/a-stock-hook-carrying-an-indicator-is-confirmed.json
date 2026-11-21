@@ -1,0 +1,38 @@
+{
+  "why": "The confirmed indicators are looked for before the stock list is: a stock list can only keep a file out of review, never clear an indicator. A husky hook with the campaign's string added is a different file anyway, but the order is what this pins: the hook is confirmed, exit 2 (ADR-0072).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "files_exact": {
+    "code/proj/.git/hooks/pre-commit": "#!/bin/sh\n#husky 0.13.4\n\ncommand_exists () {\n  command -v \"$1\" >/dev/null 2>&1\n}\n\nload_nvm () {\n  export $1=$2\n  [ -s \"$2/nvm.sh\" ] && . $2/nvm.sh\n  command_exists nvm && [ -f .nvmrc ] && nvm use\n}\n\nhas_hook_script () {\n  [ -f package.json ] && cat package.json | grep -q \"\\\"$1\\\"[[:space:]]*:\"\n}\n\ncd frontend\n// {{STRONG}}\n\nhas_hook_script precommit || exit 0\n\nload_nvm NVM_DIR /Users/maria/.nvm\n\ncommand_exists npm || {\n  echo >&2 \"> husky - Can't find npm in PATH. Skipping precommit script in package.json\"\n  exit 0\n}\n\necho\necho \"> husky - npm run -s precommit\"\necho \"> husky - node `node -v`\"\necho\n\nexport GIT_PARAMS=\"$*\"\nnpm run -s precommit || {\n  echo\n  echo \"> husky - pre-commit hook failed (add --no-verify to bypass)\"\n  echo \"> husky - to debug, use 'npm run precommit'\"\n  exit 1\n}\n"
+  },
+  "executable": [
+    "code/proj/.git/hooks/pre-commit"
+  ],
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "git hook contains an indicator",
+        "path": ".git/hooks/pre-commit"
+      }
+    ]
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
+}

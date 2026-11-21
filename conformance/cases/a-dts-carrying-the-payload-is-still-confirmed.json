@@ -1,0 +1,19 @@
+{
+  "why": "A declaration file is no longer a build config, but it is TypeScript source, and every TypeScript file is read for the confirmed indicators (ADR-0058). The payload appended to tailwind.config.d.ts is confirmed, exit 2 (ADR-0072).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/app/types/tailwind.config.d.ts": "export {}\n{{PAD}}{{STRONG}}\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "source file contains an indicator",
+        "path": "tailwind.config.d.ts"
+      }
+    ]
+  }
+}

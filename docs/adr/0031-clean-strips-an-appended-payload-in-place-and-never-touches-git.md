@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0068](./0068-local-git-history-is-read-with-the-disk-s-rules.md), which has clean read git and still never change it |
 | **Date** | 2026-10-03 |
 
 ## Context

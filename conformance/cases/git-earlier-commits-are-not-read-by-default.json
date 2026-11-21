@@ -1,0 +1,32 @@
+{
+  "why": "A payload in a commit behind every branch tip, or in an object nothing reaches, is not put back by a checkout of any branch, and reading all of history costs far more than reading the tips. By default only what a checkout, reset, restore or stash pop can bring back is read, so this repository is clean, exit 0, and the ok line says what was read. git-earlier-commits-are-read-with-git-all pins the other half (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        },
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n"
+          }
+        }
+      ],
+      "loose": "export const x = 1\n{{PAD}}{{STRONG}}\n"
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "tree_may_change": false,
+    "findings": [],
+    "must_print": [
+      "1 git repository read (last commits, staged files, 1 branch or tag, 0 stashes), none holds the payload"
+    ]
+  }
+}

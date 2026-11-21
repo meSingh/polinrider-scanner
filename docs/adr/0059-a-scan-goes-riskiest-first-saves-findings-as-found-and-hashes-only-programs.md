@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md), which saves step 2's place so a stopped check can be continued |
+| **Status** | Accepted; amended by [ADR-0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md), which saves step 2's place so a stopped check can be continued, and by [ADR-0070](./0070-a-pipe-is-told-once-a-minute-that-a-step-is-still-running.md), which tells a pipe once a minute that a step is still running |
 | **Date** | 2026-11-15 |
 
 ## Context

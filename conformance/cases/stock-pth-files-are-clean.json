@@ -1,0 +1,19 @@
+{
+  "why": "Each of these is what its package installs: coloredlogs.pth (coloredlogs 14.0 and 15.0.1), which runs its on-switch through an exec and was reviewed five times in the 2026-11-16 field report; setuptools' distutils-precedence.pth; the _virtualenv.pth virtualenv writes; and protobuf's namespace stub. coloredlogs.pth is known by the hash of every byte, listed in stock-files.txt with its source; the other three use no call the startup-file check looks for, and never did. All four are quiet, exit 0 (ADR-0072).",
+  "roots": [
+    "code"
+  ],
+  "files_exact": {
+    "code/env/lib/python3.12/site-packages/coloredlogs.pth": "import os; exec('try: __import__(\"coloredlogs\").auto_install() if os.environ.get(\"COLOREDLOGS_AUTO_INSTALL\") else None\\nexcept ImportError: pass')\n",
+    "code/env/lib/python3.12/site-packages/distutils-precedence.pth": "import os; var = 'SETUPTOOLS_USE_DISTUTILS'; enabled = os.environ.get(var, 'local') == 'local'; enabled and __import__('_distutils_hack').add_shim(); \n",
+    "code/env/lib/python3.12/site-packages/_virtualenv.pth": "import _virtualenv",
+    "code/env/lib/python3.12/site-packages/protobuf-3.20.3-nspkg.pth": "import sys, types, os;has_mfs = sys.version_info > (3, 5);p = os.path.join(sys._getframe(1).f_locals['sitedir'], *('google',));importlib = has_mfs and __import__('importlib.util');has_mfs and __import__('importlib.machinery');m = has_mfs and sys.modules.setdefault('google', importlib.util.module_from_spec(importlib.machinery.PathFinder.find_spec('google', [os.path.dirname(p)])));m = m or sys.modules.setdefault('google', types.ModuleType('google'));mp = (m or []) and m.__dict__.setdefault('__path__',[]);(p not in mp) and mp.append(p)\n"
+  },
+  "expect": {
+    "exit": 0,
+    "findings": [],
+    "must_not_print": [
+      "Python startup file runs code"
+    ]
+  }
+}

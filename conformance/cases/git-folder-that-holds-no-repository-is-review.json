@@ -1,0 +1,21 @@
+{
+  "why": "A .git folder that git cannot open, here one holding only hooks, cannot be read for history. Not read is not clean: the run names it with git's reason, as review (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/.git/hooks/README": "nothing\n",
+    "code/proj/index.js": "export {}\n"
+  },
+  "expect": {
+    "exit": 1,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "review",
+        "match": "git could not read this repository (",
+        "path": "proj"
+      }
+    ]
+  }
+}

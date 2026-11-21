@@ -229,6 +229,11 @@ fn read_pth(text: &str, ind: &Indicators) -> Pth {
     if ind.has_strong(text) {
         return Pth::Indicator;
     }
+    // What a package installs, byte for byte: coloredlogs runs its own
+    // switch through an exec. ADR-0072.
+    if ind.stock_pth(text.as_bytes()).is_some() {
+        return Pth::Quiet;
+    }
     // site.py executes a line that starts with "import" and a space or a
     // tab, exactly. Everything else is a path, or a comment.
     let executes = |line: &&str| line.starts_with("import ") || line.starts_with("import\t");
@@ -243,15 +248,22 @@ fn read_pth(text: &str, ind: &Indicators) -> Pth {
 /// the scanned paths and in the virtual environments there, then those of
 /// this user's Python under `home`, then, with a host to read, those
 /// installed for every user.
+#[allow(clippy::too_many_arguments)]
 pub fn python_startup(
     walk: &Walk,
     home: Option<&Path>,
+    home_skipped: bool,
     host: Option<&dyn Host>,
     ind: &Indicators,
     v: &mut Verdict,
     sink: &mut Sink,
 ) {
     v.section("Python startup files (.pth)");
+    if home_skipped {
+        v.push(Finding::info(
+            "Python installed in the home folder: skipped, --fs-only",
+        ));
+    }
     let mut files: Vec<(PathBuf, PathBuf)> = Vec::new();
 
     for path in walk.by_name(|n| n.ends_with(".pth")) {

@@ -26,6 +26,11 @@ pub struct Scope<'a> {
     /// has one. `None` when it is of the given directories and nothing else,
     /// which is what `clean` does.
     pub home: Option<&'a Path>,
+    /// Whether the files under `home` may be read: false under --fs-only
+    /// when the home is this machine's and was not named. ADR-0069.
+    pub home_read: bool,
+    /// Read every commit and object of each git repository. ADR-0068.
+    pub git_all: bool,
     /// The machine, when its live state is to be read. `None` skips the host
     /// checks and says so.
     pub host: Option<&'a dyn Host>,
@@ -69,6 +74,15 @@ pub enum Event<'a> {
         step: usize,
         n: usize,
         of: Option<usize>,
+        /// How long the step has been running. ADR-0070.
+        elapsed: Duration,
+    },
+    /// How many of the git repositories the walk found have been read, in
+    /// step 2. ADR-0068.
+    Repos {
+        n: usize,
+        of: usize,
+        elapsed: Duration,
     },
     /// A confirmed or review finding, the moment it is made.
     Found(&'a Finding),
@@ -111,7 +125,18 @@ impl Stream<'_> {
     fn count(&mut self, n: usize, of: Option<usize>, fresh: Vec<Finding>) {
         self.found(fresh);
         let step = self.step;
-        (self.tell)(Event::Count { step, n, of });
+        let elapsed = self.started.elapsed();
+        (self.tell)(Event::Count {
+            step,
+            n,
+            of,
+            elapsed,
+        });
+    }
+
+    fn repos(&mut self, n: usize, of: usize) {
+        let elapsed = self.started.elapsed();
+        (self.tell)(Event::Repos { n, of, elapsed });
     }
 
     fn done(&mut self, v: &mut Verdict) {
@@ -169,23 +194,31 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     // What the machine itself holds comes first: it needs no walk.
     s.start(1);
     if let Some(home) = scope.home {
-        checks::implant_installs(
-            ind,
-            &ImplantScope {
-                home: Some(home),
-                ioc_dir: scope.ioc_dir,
-                host,
-            },
-            v,
-            sink,
-        );
+        if scope.home_read {
+            checks::implant_installs(
+                ind,
+                &ImplantScope {
+                    home: Some(home),
+                    ioc_dir: scope.ioc_dir,
+                    host,
+                },
+                v,
+                sink,
+            );
+        } else {
+            v.section("Second-stage implant: install paths skipped, --fs-only");
+        }
         s.flush(v);
         if host.is_some() {
             checks::extensions(&extension_dirs(home), ind, v, sink);
         } else {
             skipped(v, "IDE extensions");
         }
-        checks::ssh_keys(home, ind, v);
+        if scope.home_read {
+            checks::ssh_keys(home, ind, v);
+        } else {
+            skipped(v, "SSH keys that let someone in");
+        }
         match host {
             Some(host) => {
                 host_checks::persistence(host, home, ind, v, sink);
@@ -270,11 +303,20 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
         )));
     }
     tasks.finish(&mut tasks_v);
+    hooks.finish(&mut hooks_v);
     let configs_stripped = configs.finish(&mut configs_v) > 0;
     v.append(tasks_v);
     v.append(configs_v);
     v.append(hooks_v);
-    runtimes::python_startup(&w, scope.home, host, ind, v, sink);
+    runtimes::python_startup(
+        &w,
+        scope.home.filter(|_| scope.home_read),
+        scope.home.is_some() && !scope.home_read,
+        host,
+        ind,
+        v,
+        sink,
+    );
     s.flush(v);
     s.done(v);
 
@@ -291,6 +333,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     checks::named_files(&w, ind, v, sink);
     checks::packages(&w, ind, v);
     s.flush(v);
+    let sizes = std::cell::RefCell::new(checks::Sizes::default());
     let skipped = checks::project_files(
         &w,
         &checks::ProjectFiles {
@@ -298,6 +341,7 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
             on_infected: scope.on_infected_config,
             configs_stripped,
             resume: scope.resume,
+            sizes: Some(&sizes),
         },
         ind,
         v,
@@ -310,6 +354,19 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
     if scope.resume.is_some() {
         v.set_skipped(skipped);
     }
+    s.flush(v);
+    // What git would put back. Read by git, never changed. ADR-0068.
+    crate::git_local::history(
+        &w,
+        ind,
+        crate::git_local::Options {
+            all: scope.git_all,
+            budget: Some(crate::git_local::BUDGET),
+            program: "git",
+        },
+        v,
+        &mut |n, of| s.repos(n, of),
+    );
     // The home directory is swept only when this machine is being read. A
     // disk checked with --fs-only gets the .env count and nothing more.
     checks::credentials(&w, host.and(scope.home), v);
@@ -318,9 +375,16 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
 
     // --- step 3: large files against the known hashes -------------------------
     s.start(3);
-    checks::known_hashes(&w, ind, v, sink, &mut |n, of, fresh| {
-        s.count(n, Some(of), fresh);
-    });
+    checks::known_hashes(
+        &w,
+        Some(&sizes.borrow()),
+        ind,
+        v,
+        sink,
+        &mut |n, of, fresh| {
+            s.count(n, Some(of), fresh);
+        },
+    );
     s.flush(v);
     s.done(v);
 }
@@ -360,6 +424,11 @@ pub fn render(v: &Verdict, target: Target) -> String {
             }
             Entry::Note(line) => {
                 if target == Target::Report {
+                    out.push_str(&format!("    {}\n", clean(line)));
+                }
+            }
+            Entry::Brief(line) => {
+                if target == Target::Console {
                     out.push_str(&format!("    {}\n", clean(line)));
                 }
             }
@@ -537,6 +606,7 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
     let not_strippable = count(|k| matches!(k, Kind::Config { strippable: false }));
     let packages = count(|k| matches!(k, Kind::Package));
     let releases = count(|k| matches!(k, Kind::HijackedRelease));
+    let histories = count(|k| matches!(k, Kind::GitHistory));
     let by_hand = count(|k| matches!(k, Kind::StartupFile));
     let cleaning = run.command == "clean";
 
@@ -638,6 +708,13 @@ pub fn next_steps(v: &Verdict, run: &Run) -> String {
         step(
             &mut out,
             "Change each hijacked package named above to another release: pin any other release, delete node_modules and reinstall.",
+            None,
+        );
+    }
+    if histories > 0 {
+        step(
+            &mut out,
+            "In each git repository named above, commit the cleaned files before any git restore, reset or checkout, then delete or rewrite the branches and stashes named. Delete a bare backup that holds the payload, or keep it offline.",
             None,
         );
     }

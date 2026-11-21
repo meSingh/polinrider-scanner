@@ -23,6 +23,7 @@ three local checks at once.
 | `implant-paths.txt` | Known implant install, persistence and working paths | `INFECTED` if the path exists |
 | `implant-names.txt` | MicrosoftSystem64 binary and process names | `INFECTED` on an exact process-name match |
 | `hashes.txt` | SHA-256 of known malicious files: MicrosoftSystem64 binaries, and small PolinRider files such as a poisoned `tasks.json` or a fake font | `INFECTED` on a hash match, whatever the file is named. Files of 10 to 300 MB are hashed, and every `tasks.json`, font file and build config at any size (ADR-0045) |
+| `stock-files.txt` | SHA-256 of files tools write the same way everywhere: stock git-lfs, husky and yorkie hooks, and coloredlogs.pth, with the source of each | Never a finding. A hook or `.pth` that matches is not sent for review; one carrying an indicator is still `INFECTED` (ADR-0072) |
 
 `network.txt` is used only by the local checks, to compare established
 connections from `node` and Electron processes against known campaign

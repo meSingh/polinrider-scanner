@@ -1,0 +1,95 @@
+# Files that tools write the same way everywhere, known by SHA-256 so that
+# the checks do not send them for review. A match says only "this is the
+# stock file", never "this is clean": the confirmed indicators are looked for
+# first, and a stock file that carries one is still confirmed (ADR-0072).
+#
+# Format: <sha256>  <kind>  <label>
+#   kind "hook": an executable file in a git hooks folder
+#   kind "pth":  a Python startup file
+#
+# A hook's hash is taken after two lines are put in a standard form, and only
+# when they have exactly these forms; every other byte counts as it is:
+#   load_nvm NVM_DIR <path>   (husky) or   load_nvm <path>   (yorkie), where
+#     <path> is /home/<name>/.nvm, /Users/<name>/.nvm or /root/.nvm and <name>
+#     is letters, digits, ".", "_" and "-", and not "." or ".."
+#   cd <dir>   (husky) or   cd "<dir>"   (yorkie), where <dir> is relative,
+#     letters, digits, ".", "_", "/" and "-", with no ".."
+# husky and yorkie write the installing user's home and the package's folder
+# into every hook, so no single hash could match two machines.
+#
+# Every file below was produced inside the development container
+# (./polinrider-sandbox, network on for that one run) on 2026-11-22, from:
+#   git-lfs: the release tarballs from github.com/git-lfs/git-lfs/releases,
+#     linux-arm64, versions 2.13.3, 3.0.2, 3.2.0, 3.3.0, 3.4.1, 3.5.1 and
+#     3.6.1, each running `git lfs install --local` in an empty repository.
+#     The hook text does not depend on the platform.
+#   husky 0.13.4 (registry.npmjs.org/husky/-/husky-0.13.4.tgz, sha512-kafsK/82…)
+#     and yorkie 2.0.0 (registry.npmjs.org/yorkie/-/yorkie-2.0.0.tgz,
+#     sha512-jcKpkthap…), installed with npm 10 from Node 20.18.1 in an empty
+#     repository, at its root and in a subfolder; their install scripts
+#     write the hooks.
+#   coloredlogs 10.0, 14.0 and 15.0.1: coloredlogs.pth from each wheel on
+#     PyPI (files.pythonhosted.org, sha256 of each wheel checked against
+#     PyPI's). 14.0 and 15.0.1 ship the same file, the one the 2026-11-16 field
+#     report found five times (dda83a85...).
+# Not listed, because the existing rules already leave them quiet:
+# distutils-precedence.pth (setuptools 50.3.2 to 80.9.0), _virtualenv.pth
+# (virtualenv 20.0.0 and 20.26.6 write "import _virtualenv") and the
+# namespace stubs *-nspkg.pth (protobuf 3.20.3, zope.interface 5.5.2,
+# sphinxcontrib-websupport 1.2.4).
+
+bbda59754e9e30c8ad41942885b98d57bd4e3561c852364fa8c36a843cfaa44a  hook  git-lfs 2.13.3, 3.0.2 post-checkout
+796dd3beaafc4b715b655d759a841eb133b22512f8b17a252fd68780bae215d7  hook  git-lfs 2.13.3, 3.0.2 post-commit
+d42e319e56564b9a730e65b4e52862f748e5486f7a0d1a535f48a5a16b9a096c  hook  git-lfs 2.13.3, 3.0.2 post-merge
+193f2f6be35f2285fe7b965c22b01319b6b1e2b666280d8235371e8fd3e26aeb  hook  git-lfs 2.13.3, 3.0.2 pre-push
+8a1e0196e746a3dec6cc7b06cb53da6c4e4c3dd887f66974ce123f4d8eaedddf  hook  git-lfs 3.2.0, 3.3.0 post-checkout
+746bd31c269234ebac6e99dc16203e4e758b9f92e7393ebe115e8172c4672b83  hook  git-lfs 3.2.0, 3.3.0 post-commit
+111524fc5ae3d64f33414456612d7ed4b9461dbc6ec64a0580fc94c9925b0fb4  hook  git-lfs 3.2.0, 3.3.0 post-merge
+eb46353aa220c7998102f036cbc28c4d46ff61f0cf2e06886feeec5c369afb20  hook  git-lfs 3.2.0, 3.3.0 pre-push
+791471b4ff472aab844a4fceaa48bbb0a12193616f971e8e940625498b4938a6  hook  git-lfs 3.4.1, 3.5.1 post-checkout
+21e961572bb3f43a5f2fbafc1cc764d86046cc2e5f0bbecebfe9684a0b73b664  hook  git-lfs 3.4.1, 3.5.1 post-commit
+75da0da66a803b4b030ad50801ba57062c6196105eb1d2251590d100edb9390b  hook  git-lfs 3.4.1, 3.5.1 post-merge
+df5417b2daa3aa144c19681d1e997df7ebfe144fb7e3e05138bd80ae998008e4  hook  git-lfs 3.4.1, 3.5.1 pre-push
+8d606e58cce98604696a4abcf3ae1ebde6f9f31ac72bb0d44e2444cc39f26030  hook  git-lfs 3.6.1 post-checkout
+f3eb4d1f62924c09d481a0563a84b158c66eb2feb3431cfdb3e6760aab4d661d  hook  git-lfs 3.6.1 post-commit
+cecb594e8fa65831654fc95e96db9f1249e09c52810c6fbb2b428280aac22158  hook  git-lfs 3.6.1 post-merge
+a52d0510d0f8c75e27852156ec6f7791f0d8ed65fc58fcc368dd1de0a60a1d74  hook  git-lfs 3.6.1 pre-push
+a6bf9fd9dffbb23567d4f5e49718342f314d12f79854d5424757cd05486b5f5a  hook  husky 0.13.4 applypatch-msg
+3388e1476279a6737dd656b0608fe79a87b60dd5e39269217fe75c2ff1c85520  hook  husky 0.13.4 commit-msg
+b62fba1baff8ec759a9fd0e694a36870a3eb95713c20facf7ae686dfff297495  hook  husky 0.13.4 post-applypatch
+bb329e00b109b9cb5b36e188fc3d95383a60b0831d0c93688bc1b5a89cb41bff  hook  husky 0.13.4 post-checkout
+ed3266850df9cf7fc0f92cfaca46de0e822726142f63ac167ad0ebea32584cea  hook  husky 0.13.4 post-commit
+7b25284bae5eb20383240a625fac0e81b57a3f705e0e69750a2f08ade9eb54d4  hook  husky 0.13.4 post-merge
+3a704a16c4bb72959cdc6a653e14102ee3ee64c4ede859d4afe0956c08e94d36  hook  husky 0.13.4 post-receive
+12648e2c27359beee85c4f2517368a168ce21791a10095a695751971fe7ad8d5  hook  husky 0.13.4 post-rewrite
+6d4e78a6317c69335daf40fa80fd912caba5ded57a11b3f2018d196d9b8e9aef  hook  husky 0.13.4 post-update
+c87f4b3ecfba1ecb4abd616f5cc41b5ffedc0ee86721075265a1427599ebe638  hook  husky 0.13.4 pre-applypatch
+0bb1aa479c4cc26e7b191c10aa4b6a51e04a2e1328a59a941fd5a029958c0508  hook  husky 0.13.4 pre-auto-gc
+75d1c49bafa039cb338ad5de4015a1d806d57555d82418031a2f3a7444ded44b  hook  husky 0.13.4 pre-commit
+4ae0ec554b5d20a1459dbedff6fcbf73a372db1459d665a4d687a67291581393  hook  husky 0.13.4 pre-push
+c2df17b51b9731c6b9fa68557d5a6ab71c34d626a5029da596a7854f959e90c7  hook  husky 0.13.4 pre-rebase
+267e2dada6fe8267bdc87ad9cd227d0cd82a1cc914499e472f1913f0b93dff5c  hook  husky 0.13.4 pre-receive
+bc33088a9ae9120028ce6d50d69b18c368288769db5c4396c28fe77efe9c2671  hook  husky 0.13.4 prepare-commit-msg
+07fc2684fc0a722662ab91070961aaba1b53ad69b4c44357a2fd6e740806718b  hook  husky 0.13.4 push-to-checkout
+498afd9e2c93d835e28f39216bd033e6fbbffe2a9142da8ee1c563be3b29c0c4  hook  husky 0.13.4 update
+f39b8c88d62786a0cb09839a606d6115ae4abd6aef6266f0324c90a736832988  hook  yorkie 2.0.0 applypatch-msg
+be9eb070606a13623f4f9aa93d7d59b3267ac57c1857af6ae6ea1cf005c8b529  hook  yorkie 2.0.0 commit-msg
+b986f8857f098f014fff8dfa1414aa000a00cbdc5564ffa419c096b7152e3d8e  hook  yorkie 2.0.0 post-applypatch
+fa834a420442c5495cae93784eeb3e9cbbbf79ea9a945772fd7c7f9a2ede7f50  hook  yorkie 2.0.0 post-checkout
+0765a2c74b946bdff820664f150b167b5582fa9bf161a4c44bc5b9467c5a0bd2  hook  yorkie 2.0.0 post-commit
+556771fcd8b2f51e54ba3990f7b1a9008159c04cf1367252e575beace9af481f  hook  yorkie 2.0.0 post-merge
+4159434b9d5ae904ec524c33eeaab56d2febb1998f85677f906fd248ca232090  hook  yorkie 2.0.0 post-receive
+150116c0deb3f16ca6142438fd0a3c7bf3de8c6361c7c51dd64f04dac30c7cd8  hook  yorkie 2.0.0 post-rewrite
+e40bfb5adc5b7c64f736e3b7d77682f099b13e16f1e7f82362b8e00548a46e5d  hook  yorkie 2.0.0 post-update
+5680ec08eba55eb34c4dba83ff14517f92635091ca1418e3bbb6463b477f8af5  hook  yorkie 2.0.0 pre-applypatch
+d72124222a3267d67647111a42d2f200d17681375a7d91890ea892e3abbfd812  hook  yorkie 2.0.0 pre-auto-gc
+f45073204c0b720a23499be0d6278700833a850d079c7e57ddeaa42cae52a7ed  hook  yorkie 2.0.0 pre-commit
+7726e03aa41cb319e29235138d9677700f3cd6d3e6636d4c112f65d3e24dfd07  hook  yorkie 2.0.0 pre-push
+4bfc100c864dbb3ff01d1432b6c2a362bd9a6e5703a356a719f3b68ff1c0df70  hook  yorkie 2.0.0 pre-rebase
+46596ab3c97430f56a94a54b8e3a2943a3010b958169e1ae6a4d380a00442a8a  hook  yorkie 2.0.0 pre-receive
+dc67ad89667eaf30864b0ef21aca3045c047b8b3260dd1527f2b5ed22047633f  hook  yorkie 2.0.0 prepare-commit-msg
+ded6dc98b1b3c1145986f24e12d4cd0f44d0784a30df0499d417dec358bcb41c  hook  yorkie 2.0.0 push-to-checkout
+af004bacee404390e701a8f3bf04b641a2b5fcc60313c2e2bf8985629ae328a5  hook  yorkie 2.0.0 sendemail-validate
+47f8f9c85dffc0ab5a20763b243d43ac2213d0cdcd8fe3697e7607f203635572  hook  yorkie 2.0.0 update
+9fd084989744cfaf6297ecf3db256e5d9b3520803b5a001821e369585e26a350  pth  coloredlogs 10.0 coloredlogs.pth
+dda83a855986efa5cd87f0248b0199c0086eb0e8e7fece7d6741959c5ce39536  pth  coloredlogs 14.0, 15.0.1 coloredlogs.pth

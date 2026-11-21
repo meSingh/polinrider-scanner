@@ -1,0 +1,52 @@
+{
+  "why": "Checking out a branch writes its files to disk. In the field, 5 of 6 working clones had between 20 and 64 branch tips carrying the payload while main was clean. Every branch, remote-tracking branch and tag is read; each one that carries it is named, and main, which is clean, is not (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n"
+          }
+        },
+        {
+          "branch": "feature/login",
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ],
+      "tags": {
+        "v1.2.0": "feature/login"
+      },
+      "clone": "code/shop-clone"
+    }
+  ],
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop"
+      },
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop-clone"
+      }
+    ],
+    "must_print": [
+      "branch feature/login: postcss.config.mjs",
+      "tag v1.2.0: postcss.config.mjs",
+      "branch origin/feature/login: postcss.config.mjs"
+    ],
+    "must_not_print": [
+      "last commit (main): postcss.config.mjs"
+    ]
+  }
+}

@@ -11,7 +11,9 @@
 //! When a step ends, it is printed for good, header first and then every
 //! finding it made. A pipe, a log and the report file get no region: each
 //! step's header as it starts, each finding as it is made, and the step's
-//! time as it ends.
+//! time as it ends. Standard output into a pipe or a log also gets a line
+//! about once a minute while a step runs, saying how far it has come; the
+//! report file does not (ADR-0070).
 
 use crate::scan::{Event, STEPS};
 use crate::verdict::{clean, Finding, Kind, Level};
@@ -25,6 +27,10 @@ const SHOWN: usize = 5;
 
 /// The width the step names are padded to, so the states line up.
 const NAME: usize = 39;
+
+/// How long a step runs before a pipe is told it is still running, and
+/// between one such line and the next. ADR-0070.
+const BEAT: Duration = Duration::from_secs(60);
 
 /// What to do with the screen after one event.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -48,6 +54,11 @@ pub struct Screen {
     /// This check continues one that stopped: step 2's count includes the
     /// files the earlier one read. ADR-0060.
     resumed: bool,
+    /// Standard output into a pipe or a log: a line a minute while a step
+    /// runs. ADR-0070.
+    beating: bool,
+    /// When, into the running step, the next such line is due.
+    next_beat: Duration,
 }
 
 impl Screen {
@@ -61,7 +72,17 @@ impl Screen {
             confirmed: 0,
             review: 0,
             resumed: false,
+            beating: false,
+            next_beat: BEAT,
         }
+    }
+
+    /// The screen of standard output: into a pipe or a log, it says once a
+    /// minute that a long step is still running. A live terminal has its
+    /// count redrawn instead, and the report file is not told. ADR-0070.
+    pub fn beating(mut self) -> Self {
+        self.beating = !self.live;
+        self
     }
 
     /// The screen of a check that continues one that stopped.
@@ -77,6 +98,7 @@ impl Screen {
                 self.step = n;
                 self.held.clear();
                 self.count = None;
+                self.next_beat = BEAT;
                 if !self.live {
                     frame.lines.push(String::new());
                     frame.lines.push(header(n, ""));
@@ -94,7 +116,12 @@ impl Screen {
                 }
                 self.held.push(lines);
             }
-            Event::Count { step, n, of } => {
+            Event::Count {
+                step,
+                n,
+                of,
+                elapsed,
+            } => {
                 if n > 0 || of.is_some() {
                     self.count = Some(match (step, of) {
                         (3, Some(of)) => {
@@ -108,6 +135,15 @@ impl Screen {
                         _ => format!("    {} files read so far", thousands(n)),
                     });
                 }
+                self.beat(elapsed, &mut frame);
+            }
+            Event::Repos { n, of, elapsed } => {
+                self.count = Some(format!(
+                    "    {} of {} git repositories read",
+                    thousands(n),
+                    thousands(of)
+                ));
+                self.beat(elapsed, &mut frame);
             }
             Event::Done(n, took) => {
                 if self.live {
@@ -126,6 +162,21 @@ impl Screen {
             Event::Save { .. } => {}
         }
         self.frame(frame)
+    }
+
+    /// Into a pipe, once a minute: the step is still running, and how far
+    /// it has come. ADR-0070.
+    fn beat(&mut self, elapsed: Duration, frame: &mut Frame) {
+        if self.beating && elapsed >= self.next_beat {
+            if let Some(count) = &self.count {
+                frame.lines.push(format!(
+                    "    still running after {}: {}",
+                    duration(elapsed),
+                    count.trim_start()
+                ));
+                self.next_beat = elapsed + BEAT;
+            }
+        }
     }
 
     fn frame(&self, mut frame: Frame) -> Frame {
@@ -208,6 +259,7 @@ fn plain(kind: Kind, message: &str) -> String {
         Kind::Implant => "the second-stage implant is on this disk",
         Kind::Propagation => "the script the payload spreads with is here",
         Kind::NamedFile => "a file carries a name the campaign uses",
+        Kind::GitHistory => "a git repository still holds the payload",
         Kind::Extension => "an editor extension carries the payload",
         Kind::LoginItem => "something that starts at login runs the payload",
         Kind::Crontab => "a scheduled job runs the payload",
@@ -310,6 +362,7 @@ mod tests {
             step: 2,
             n: 1_284_551,
             of: None,
+            elapsed: Duration::from_secs(600),
         });
         assert_eq!(
             f.region,
@@ -323,6 +376,74 @@ mod tests {
                 "  Step 3 of 3  Large files against known hashes       waiting",
             ]
         );
+    }
+
+    #[test]
+    fn a_pipe_is_told_once_a_minute_that_a_long_step_is_still_running() {
+        let root = PathBuf::from("/Volumes/OldMac");
+        let count = |step, n, of, secs| Event::Count {
+            step,
+            n,
+            of,
+            elapsed: Duration::from_secs(secs),
+        };
+        let mut s = Screen::new(std::slice::from_ref(&root), false).beating();
+        let mut out = Vec::new();
+        let _ = s.event(&Event::Started(2));
+        for (n, secs) in [
+            (1024, 30),
+            (61_440, 59),
+            (62_464, 61),
+            (90_112, 90),
+            (118_784, 125),
+        ] {
+            out.extend(s.event(&count(2, n, None, secs)).lines);
+        }
+        assert_eq!(
+            out,
+            vec![
+                "    still running after 1m 1s: 62,464 files read so far",
+                "    still running after 2m 5s: 118,784 files read so far",
+            ]
+        );
+        // The git part of step 2 counts repositories.
+        assert_eq!(
+            s.event(&Event::Repos {
+                n: 12,
+                of: 410,
+                elapsed: Duration::from_secs(242),
+            })
+            .lines,
+            vec!["    still running after 4m 2s: 12 of 410 git repositories read"]
+        );
+        // Each step starts its own minute, in its own words.
+        let _ = s.event(&Event::Done(2, Duration::from_secs(130)));
+        let _ = s.event(&Event::Started(3));
+        assert_eq!(
+            s.event(&count(3, 14, Some(61), 120)).lines,
+            vec!["    still running after 2m 0s: 14 of 61 files hashed"]
+        );
+        let mut s = Screen::new(std::slice::from_ref(&root), false).beating();
+        let _ = s.event(&Event::Started(1));
+        assert_eq!(
+            s.event(&count(1, 98_304, None, 60)).lines,
+            vec!["    still running after 1m 0s: 98,304 files listed so far"]
+        );
+        let mut s = Screen::new(std::slice::from_ref(&root), false)
+            .resumed()
+            .beating();
+        let _ = s.event(&Event::Started(2));
+        assert_eq!(
+            s.event(&count(2, 61_440, None, 60)).lines,
+            vec!["    still running after 1m 0s: 61,440 files read so far, counting the earlier check"]
+        );
+        // The report file and a live terminal never get the line.
+        let mut file = Screen::new(std::slice::from_ref(&root), false);
+        let mut live = Screen::new(std::slice::from_ref(&root), true).beating();
+        for s in [&mut file, &mut live] {
+            let _ = s.event(&Event::Started(2));
+            assert!(s.event(&count(2, 61_440, None, 600)).lines.is_empty());
+        }
     }
 
     #[test]

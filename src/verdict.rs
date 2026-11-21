@@ -67,6 +67,10 @@ pub enum Kind {
     Propagation,
     /// A file whose name alone is an indicator, from `ioc/filenames.txt`.
     NamedFile,
+    /// A git repository whose last commit, staged files, branches, tags or
+    /// stashes still hold the payload, so a git restore puts it back. Git is
+    /// never changed: it is fixed by hand. ADR-0068.
+    GitHistory,
     /// An editor extension carrying an indicator.
     Extension,
     /// Something that starts at login or on a schedule: a systemd unit, an
@@ -114,6 +118,7 @@ impl Kind {
                 | Kind::Package
                 | Kind::HijackedRelease
                 | Kind::NamedFile
+                | Kind::GitHistory
         )
     }
 
@@ -188,6 +193,10 @@ impl Kind {
                 "file the campaign is known to leave behind",
                 "files the campaign is known to leave behind",
             ),
+            Kind::GitHistory => (
+                "git repository that still holds the payload",
+                "git repositories that still hold the payload",
+            ),
             Kind::Extension => (
                 "editor extension carrying the payload",
                 "editor extensions carrying the payload",
@@ -255,6 +264,7 @@ impl Kind {
             Kind::NpmProgram => "A changed copy of npm",
             Kind::PthFile => "A Python startup file",
             Kind::AppStartup => "A changed editor or app",
+            Kind::GitHistory => "A git repository",
             Kind::Autostart => "An entry that starts with Windows",
             Kind::SshKey => "The attacker's SSH key",
             Kind::Process => "A running program",
@@ -416,6 +426,9 @@ pub enum Entry {
     /// Inventory that goes to the report file only. On the console a wall of
     /// paths nobody reads is worse than the count that summarises it.
     Note(String),
+    /// The console's word for what it leaves to the report: shown on the
+    /// console only, beside the details it cut short.
+    Brief(String),
 }
 
 /// Everything a scan concluded, in the order it concluded it.
@@ -490,6 +503,10 @@ impl Verdict {
         self.entries.push(Entry::Note(line.into()));
     }
 
+    pub fn brief(&mut self, line: impl Into<String>) {
+        self.entries.push(Entry::Brief(line.into()));
+    }
+
     pub fn set_files(&mut self, files: usize) {
         self.files = files;
     }
@@ -505,7 +522,7 @@ impl Verdict {
     pub fn findings(&self) -> impl Iterator<Item = &Finding> {
         self.entries.iter().filter_map(|e| match e {
             Entry::Finding(f) => Some(f),
-            Entry::Section(_) | Entry::Detail(_) | Entry::Note(_) => None,
+            Entry::Section(_) | Entry::Detail(_) | Entry::Note(_) | Entry::Brief(_) => None,
         })
     }
 

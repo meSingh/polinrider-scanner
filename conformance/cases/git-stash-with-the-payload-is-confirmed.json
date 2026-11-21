@@ -1,0 +1,35 @@
+{
+  "why": "git stash pop writes a stash back to disk, and a stash keeps the work tree, the index and the untracked files. A payload stashed away, here in an untracked file, comes back with it; it is confirmed and named by its stash (ADR-0068).",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "README.txt": "shop\n"
+          }
+        }
+      ],
+      "stash": {
+        "eslint.config.js": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+      }
+    }
+  ],
+  "expect": {
+    "exit": 2,
+    "tree_may_change": false,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "the payload is in this repository's git history",
+        "path": "shop"
+      }
+    ],
+    "must_print": [
+      "stash@{0}: eslint.config.js"
+    ]
+  }
+}

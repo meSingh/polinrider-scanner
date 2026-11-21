@@ -91,6 +91,23 @@ answer to be measured against.
 A `home` map is written under the fixture's home directory, for startup files,
 `~/.npmrc` and user-level persistence.
 
+An `args` list adds flags to the case's run, as `then.args` does for a second
+run of the same tree.
+A `files_exact` map is written byte for byte, trailing newlines included, for
+files known by their hash; `files` drops a file's final newlines.
+`executable` lists tree paths to mark executable, such as git hooks.
+
+A `git` list builds real repositories in the tree before the files are written,
+so `files` become changes not yet committed. Each entry has a `dir` and, all
+optional: `commits` (each with a `branch`, default `main`, a new branch
+starting from `main`, `files` and `remove`), `tags` (name to branch), `stash`
+and `stage` (file maps stashed or staged after the commits), `bare` and
+`clone` (paths of a bare copy and a plain clone) and `loose` (a blob nothing
+reaches). `"no_git": true` runs the binary with no git on its `PATH`.
+
+`"home_flag": false` runs without `--home`, with the fixture home as `$HOME`:
+the home is then the machine's own, as it is when nobody names one.
+
 **An absent file is not an empty file.** Empty means the question was asked and
 the answer was nothing. Absent means nobody asked, and the scan has to say so
 with a `[review]` line. `<name>.absent` records that the tool which would

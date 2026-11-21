@@ -1,0 +1,41 @@
+{
+  "why": "The hash covers every byte of the hook apart from the two lines husky fills in per install, so a line added anywhere makes it a different file: it is reviewed as any unknown hook is. Here one line that runs a script in the repository is added after the cd line of an otherwise stock husky hook.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "files_exact": {
+    "code/proj/.git/hooks/pre-commit": "#!/bin/sh\n#husky 0.13.4\n\ncommand_exists () {\n  command -v \"$1\" >/dev/null 2>&1\n}\n\nload_nvm () {\n  export $1=$2\n  [ -s \"$2/nvm.sh\" ] && . $2/nvm.sh\n  command_exists nvm && [ -f .nvmrc ] && nvm use\n}\n\nhas_hook_script () {\n  [ -f package.json ] && cat package.json | grep -q \"\\\"$1\\\"[[:space:]]*:\"\n}\n\ncd frontend\nnode ./scripts/setup.js\n\nhas_hook_script precommit || exit 0\n\nload_nvm NVM_DIR /Users/maria/.nvm\n\ncommand_exists npm || {\n  echo >&2 \"> husky - Can't find npm in PATH. Skipping precommit script in package.json\"\n  exit 0\n}\n\necho\necho \"> husky - npm run -s precommit\"\necho \"> husky - node `node -v`\"\necho\n\nexport GIT_PARAMS=\"$*\"\nnpm run -s precommit || {\n  echo\n  echo \"> husky - pre-commit hook failed (add --no-verify to bypass)\"\n  echo \"> husky - to debug, use 'npm run precommit'\"\n  exit 1\n}\n"
+  },
+  "executable": [
+    "code/proj/.git/hooks/pre-commit"
+  ],
+  "expect": {
+    "exit": 1,
+    "findings": [
+      {
+        "level": "review",
+        "match": "active git hook, verify by hand",
+        "path": ".git/hooks/pre-commit"
+      }
+    ],
+    "must_not_print": [
+      "stock hook"
+    ]
+  },
+  "git": [
+    {
+      "dir": "code/proj",
+      "commits": [
+        {
+          "branch": "main",
+          "files": {
+            "README.txt": "a project\n"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -159,6 +159,10 @@ fn main() -> ProcExit {
         ioc_dir: &args.ioc,
         ind: &ind,
         home: if clean { None } else { Some(&args.home) },
+        // Under --fs-only, $HOME is this machine's and is not read; a home
+        // named with --home is part of the disk being checked. ADR-0069.
+        home_read: !args.fs_only || args.home_named,
+        git_all: args.git_all,
         host,
         on_infected_config: if clean {
             OnInfectedConfig::Strip
@@ -172,7 +176,7 @@ fn main() -> ProcExit {
     // Asked not to sleep for as long as the scan runs.
     let awake = Awake::hold();
     let mut painter = Painter { ui: &ui, drawn: 0 };
-    let mut on_screen = Screen::new(&args.roots, ui.live);
+    let mut on_screen = Screen::new(&args.roots, ui.live).beating();
     let mut in_file = Screen::new(&args.roots, false);
     if resume.is_some() {
         on_screen = on_screen.resumed();
@@ -250,7 +254,11 @@ fn check_options(args: &cli::Args) -> Vec<String> {
         (Some(dir), false) => format!("host-state {}", dir.display()),
         (None, false) => "this machine".to_string(),
     };
-    vec![host, format!("home {}", args.home.display())]
+    let mut options = vec![host, format!("home {}", args.home.display())];
+    if args.git_all {
+        options.push("git-all".into());
+    }
+    options
 }
 
 /// Whether to continue an earlier check: with --resume, yes; with --fresh,
