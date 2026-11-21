@@ -27,6 +27,7 @@ export const GET: APIRoute = async () => {
     link('Quick start', `${SITE_URL}/docs/quick-start/`, 'install, verify and run the scanner'),
     link('Is it PolinRider or a false alarm?', f.pages.updates.find((u) => u.url.endsWith('/polinrider-or-false-alarm/'))!.url, 'how to read a result'),
     link('Removing PolinRider: do it in this order', `${SITE_URL}/docs/guides/order/`, 'why it comes back, and the order that stops it'),
+    link('PolinRider Scanner GitHub action', `${SITE_URL}/github-action/`, 'scan every push and pull request with the released binary, pinned by hash'),
     '',
     ...groups.flatMap((g) => [`## Docs: ${g}`, ...f.pages.docs.filter((d) => d.group === g).map((d) => link(d.title, d.url, d.description)), '']),
     '## Updates',
