@@ -91,3 +91,73 @@ jobs:
         run: |
           ./ci/scan-workspace.sh --path . --all-refs --fail-on infected \
             --exclude '(^|/)(lib|ci|src|conformance|github-org-recovery|github-account-recovery)/|(^|/)docs-site/(book|dist|node_modules|\\.astro)/'
+
+  # The action (meSingh/polinrider-action, the action/ submodule, ADR-0062)
+  # run the way a user's workflow runs it, on a real runner, against a clean
+  # fixture and an infected one. The fixtures are built in the runner's
+  # temporary directory from ioc/ at run time, so no payload is committed
+  # and the self-scan above has nothing new to find. The infected run uses
+  # fail-on: never so this job can check the verdict instead of failing on it;
+  # its annotations and job summary are the action's real output.
+  action:
+    name: Test the action
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Build the fixtures
+        env:
+          FIXTURES: ${{ runner.temp }}/polinrider-fixtures
+        run: |
+          strong=$(awk '!/^#/ && NF { print; exit }' ioc/strong.txt)
+          weak=$(awk '!/^#/ && NF { print; exit }' ioc/weak.txt)
+          [[ -n "$strong" && -n "$weak" ]]
+          pad=$(printf '%280s' '')
+
+          mkdir -p "$FIXTURES/clean/src"
+          printf 'export default { plugins: [] };\n' > "$FIXTURES/clean/vite.config.js"
+          printf 'console.log("hello");\n' > "$FIXTURES/clean/src/app.js"
+
+          mkdir -p "$FIXTURES/infected/src" "$FIXTURES/infected/.vscode"
+          printf 'export default { plugins: [] };%s%s\n' "$pad" "$strong" > "$FIXTURES/infected/vite.config.js"
+          printf '{"version":"2.0.0","tasks":[{"label":"x","type":"shell","command":"node -e \\"%s\\"","runOptions":{"runOn":"folderOpen"}}]}\n' \
+            "$strong" > "$FIXTURES/infected/.vscode/tasks.json"
+          printf 'const x = "%s";\n' "$weak" > "$FIXTURES/infected/src/app.js"
+
+      - name: The action on the clean fixture
+        id: clean
+        uses: ./action
+        with:
+          path: ${{ runner.temp }}/polinrider-fixtures/clean
+
+      - name: The action on the infected fixture
+        id: infected
+        uses: ./action
+        with:
+          path: ${{ runner.temp }}/polinrider-fixtures/infected
+          fail-on: never
+
+      - name: Check the verdicts
+        env:
+          CLEAN_VERDICT: ${{ steps.clean.outputs.verdict }}
+          CLEAN_CONFIRMED: ${{ steps.clean.outputs.confirmed }}
+          CLEAN_FILES: ${{ steps.clean.outputs.files }}
+          INFECTED_VERDICT: ${{ steps.infected.outputs.verdict }}
+          INFECTED_CONFIRMED: ${{ steps.infected.outputs.confirmed }}
+          INFECTED_REVIEW: ${{ steps.infected.outputs.review }}
+          INFECTED_PR: ${{ steps.infected.outputs.pr-url }}
+        run: |
+          echo "clean:    verdict ${CLEAN_VERDICT}, ${CLEAN_CONFIRMED} confirmed, ${CLEAN_FILES} files"
+          echo "infected: verdict ${INFECTED_VERDICT}, ${INFECTED_CONFIRMED} confirmed, ${INFECTED_REVIEW} to review"
+          fail=0
+          [[ "$CLEAN_VERDICT" == clean && "$CLEAN_CONFIRMED" == 0 && "$CLEAN_FILES" -gt 0 ]] \
+            || { echo "::error::the clean fixture did not come back clean"; fail=1; }
+          [[ "$INFECTED_VERDICT" == infected && "$INFECTED_CONFIRMED" -ge 2 && "$INFECTED_REVIEW" -ge 1 ]] \
+            || { echo "::error::the infected fixture did not come back infected with both confirmed findings"; fail=1; }
+          [[ -z "$INFECTED_PR" ]] \
+            || { echo "::error::check mode opened a pull request"; fail=1; }
+          exit $fail

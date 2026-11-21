@@ -19,3 +19,15 @@ updates:
       prefix: ci
     labels:
       - dependencies
+
+  # action/ is a submodule: meSingh/polinrider-action at one commit
+  # (ADR-0062). After a release moves the action, this opens the pull request
+  # that moves the pointer here, and that pull request's CI runs the action.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: action
+    labels:
+      - dependencies
