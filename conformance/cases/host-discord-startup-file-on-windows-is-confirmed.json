@@ -1,0 +1,34 @@
+{
+  "why": "Discord keeps its core module in a folder per version, app-1.0.9 and discord_desktop_core-1, both of which change as Discord updates. Greenflagged gives the module path under the user's AppData; the folder names are matched with a wildcard so an update does not hide a patched file.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {
+    "AppData/Local/Discord/app-1.0.9/modules/discord_desktop_core-1/discord_desktop_core/index.js": "module.exports = require('./core.asar');\n{{STRONG}}\n"
+  },
+  "host": {
+    "platform": "windows\n",
+    "processes": "",
+    "connections": "",
+    "git-config": "",
+    "root/.keep": "",
+    "run-keys": "",
+    "scheduled-tasks": ""
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "Discord's startup file contains an indicator",
+        "path": "discord_desktop_core/index.js"
+      }
+    ],
+    "must_print": [
+      "Quit Discord and install it again"
+    ]
+  }
+}

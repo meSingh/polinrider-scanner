@@ -5,6 +5,7 @@
 //! An implementation is finished when it agrees with that corpus, not when it
 //! compiles. See ADR-0026.
 
+pub mod apps;
 pub mod awake;
 pub mod checks;
 pub mod cli;

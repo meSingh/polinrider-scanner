@@ -1,0 +1,15 @@
+{
+  "why": "With --fs-only there is no machine to trust for install paths: a disk from another computer has its own. The check does not run, and a skipped section must never read as one that looked and found nothing, so it says skipped.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "Editor and app startup files: skipped, --fs-only"
+    ]
+  }
+}

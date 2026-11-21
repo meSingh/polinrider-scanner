@@ -215,6 +215,7 @@ fn plain(kind: Kind, message: &str) -> String {
         Kind::Registry => "an npm setting runs the payload",
         Kind::NpmProgram => "npm's own program files were changed to run the payload",
         Kind::PthFile => "a Python startup file runs the payload",
+        Kind::AppStartup => "an editor or app was changed to run the payload",
         Kind::Autostart => "an entry that starts with Windows runs the payload",
         Kind::SshKey => "the attacker's SSH key can log in",
         Kind::Process => "the implant is running now",

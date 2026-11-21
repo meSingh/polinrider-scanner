@@ -1521,6 +1521,15 @@ fn what_now(
             ],
         ));
     }
+    if found.kinds().any(|k| k == Kind::AppStartup) {
+        todos.push(todo(
+            "Reinstall the editors and apps the report names",
+            &[
+                "Each one was changed to start the payload when it opens.",
+                "Quit it and install it again from its maker's site before you open it.",
+            ],
+        ));
+    }
     if found.kinds().any(|k| k == Kind::PthFile) {
         todos.push(todo(
             "Remove the Python package that started the payload",

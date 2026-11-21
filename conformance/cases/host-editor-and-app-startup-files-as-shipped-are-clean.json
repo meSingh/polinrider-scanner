@@ -1,0 +1,34 @@
+{
+  "why": "These files are on almost every developer's machine. As their apps ship them, a minified main.js, the deviceid module and Discord's one-line index.js, none may be a finding, and the check says how many installs it read.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {
+    ".config/discord/0.0.112/modules/discord_desktop_core/index.js": "module.exports = require('./core.asar');\n"
+  },
+  "host": {
+    "platform": "linux\n",
+    "processes": "",
+    "connections": "",
+    "crontab": "",
+    "git-config": "",
+    "root/.keep": "",
+    "root/usr/share/code/resources/app/out/main.js": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n",
+    "root/usr/share/cursor/resources/app/out/main.js": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n",
+    "root/usr/share/cursor/resources/app/node_modules/@vscode/deviceid/dist/index.js": "\"use strict\";Object.defineProperty(exports,\"__esModule\",{value:true});exports.getDeviceId=void 0;const path=require(\"path\");\n",
+    "root/usr/share/antigravity/resources/app/node_modules/@vscode/deviceid/dist/index.js": "\"use strict\";Object.defineProperty(exports,\"__esModule\",{value:true});exports.getDeviceId=void 0;const path=require(\"path\");\n"
+  },
+  "expect": {
+    "exit": 0,
+    "must_print": [
+      "4 editors and apps checked, their startup files are as shipped"
+    ],
+    "must_not_report": [
+      "[HIT]",
+      "[review]"
+    ]
+  }
+}

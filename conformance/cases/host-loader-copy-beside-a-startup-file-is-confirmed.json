@@ -1,0 +1,37 @@
+{
+  "why": "The second stage leaves a .inz.cjs copy of the loader beside each startup file it patches, and .inz.orig and .inz.tmp copies too (Greenflagged). filenames.txt carries .inz.cjs as confirmed and filenames-review.txt the other two as review, because patch writes .orig files innocently. The walk never enters /Applications, so on this machine those names matched nothing until this check looked beside each startup file.",
+  "roots": [
+    "code"
+  ],
+  "files": {
+    "code/proj/src/index.js": "export const hello = () => 'world'\n"
+  },
+  "home": {},
+  "host": {
+    "platform": "macos\n",
+    "processes": "",
+    "connections": "",
+    "crontab": "",
+    "git-config": "",
+    "root/.keep": "",
+    "root/Applications/Cursor.app/Contents/Resources/app/out/main.js": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n",
+    "root/Applications/Cursor.app/Contents/Resources/app/out/main.inz.cjs": "module.exports = {};\n",
+    "root/Applications/Visual Studio Code.app/Contents/Resources/app/out/main.js": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n",
+    "root/Applications/Visual Studio Code.app/Contents/Resources/app/out/main.js.inz.orig": "\"use strict\";var e=require(\"electron\");e.app.whenReady().then(function(){return 1});\n"
+  },
+  "expect": {
+    "exit": 2,
+    "findings": [
+      {
+        "level": "HIT",
+        "match": "a copy of the loader sits beside Cursor's startup file",
+        "path": "out/main.inz.cjs"
+      },
+      {
+        "level": "review",
+        "match": "a backup the payload leaves sits beside VS Code's startup file",
+        "path": "out/main.js.inz.orig"
+      }
+    ]
+  }
+}

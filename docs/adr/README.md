@@ -77,6 +77,7 @@ If you disagree with one, open an issue and quote its number.
 | [0060](./0060-a-stopped-check-can-be-continued-from-its-last-save-point.md) | A stopped check can be continued from its last save point | Accepted |
 | [0062](./0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md) | Offer a GitHub action that runs the released binary pinned by hash, beside the vendored copy | Accepted |
 | [0063](./0063-a-hijacked-release-is-matched-by-name-and-version.md) | A hijacked release is matched by name and version | Accepted |
+| [0064](./0064-editor-and-app-startup-files-are-read-at-their-install-paths.md) | Editor and app startup files are read at their install paths | Accepted |
 | [0065](./0065-a-font-is-read-whatever-font-extension-it-has.md) | A font is read whatever font extension it has | Accepted |
 
 ## Adding one
