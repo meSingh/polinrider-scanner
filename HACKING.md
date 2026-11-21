@@ -124,17 +124,20 @@ edit-and-see-it loop.
 Marketplace listing ([ADR-0062](./docs/adr/0062-a-github-action-runs-the-released-binary-pinned-by-hash-beside-the-vendored-copy.md)).
 A change to the action is two commits, in this order:
 
-1. **In the action.** Make the change inside `action/` (or a separate clone),
-   run its tests, commit signed and push to the action's repository, through
-   a pull request there:
+1. **In the action.** Make the change inside `action/`, never in a clone
+   outside this working tree. Run its tests, commit signed and push to the
+   action's repository, through a pull request there:
 
    ```bash
+   git submodule update --init action   # once, after cloning
    cd action
-   git checkout -b my-change origin/main
+   git fetch && git checkout -b my-change origin/main
    # edit, then run the fixtures in a disposable container:
-   gh release download v3.1.0 --repo meSingh/polinrider-scanner \
-     --pattern 'polinrider-v3.1.0-linux-*.tar.gz' --dir dist/v3.1.0
+   VERSION=$(sed -n 's/.*POLINRIDER_VERSION: "\(.*\)"/\1/p' action.yml)
+   gh release download "v$VERSION" --repo meSingh/polinrider-scanner \
+     --pattern "polinrider-v$VERSION-linux-*.tar.gz" --dir "dist/v$VERSION"
    test/container.sh dist
+   git push -u origin my-change && gh pr create --repo meSingh/polinrider-action
    ```
 
 2. **Here.** Once it is merged there, move the pointer and commit that in a
@@ -149,7 +152,8 @@ You rarely do step 2 by hand: Dependabot opens that pull request each week the
 action has moved. A new polinrider release moves the action itself: the
 Release workflow opens a pull request on the action's repository with the new
 version and hashes, and the maintainer tags the action's next version (v1.1.0
-for polinrider 3.2.0) once it is merged.
+for the polinrider release after 3.2.0) once it is merged. Tags are signed and
+protected: they cannot be moved or deleted.
 
 ## A limit worth knowing
 
