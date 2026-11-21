@@ -470,8 +470,10 @@ jobs:
           GH_TOKEN: ${{ secrets.PACKAGING_TOKEN }}
           TAG: ${{ needs.check.outputs.tag }}
         run: |
-          if ! gh api repos/meSingh/polinrider-action --jq .full_name >/dev/null 2>&1; then
-            echo "::notice title=Action not bumped::PACKAGING_TOKEN cannot reach meSingh/polinrider-action, so the action was not touched. Bump it by hand with packaging/action.sh."
+          # The repository is public, so any token can read it: ask whether
+          # this one can write to it.
+          if [ "$(gh api repos/meSingh/polinrider-action --jq .permissions.push 2>/dev/null)" != true ]; then
+            echo "::notice title=Action not bumped::PACKAGING_TOKEN cannot write to meSingh/polinrider-action, so the action was not touched. Bump it by hand with packaging/action.sh."
             exit 0
           fi
           packaging/bump.sh meSingh/polinrider-action action.yml \
