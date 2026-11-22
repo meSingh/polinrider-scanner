@@ -17,7 +17,7 @@ Clean:
 PolinRider Scanner: clean
 
 Nothing found in 1,284 files.
-PolinRider 3.2.0, indicators last reviewed 16 November 2026.
+PolinRider 3.3.1, indicators last reviewed 16 November 2026.
 ```
 
 Infected:
@@ -26,7 +26,7 @@ Infected:
 PolinRider Scanner: infected
 
 2 confirmed and 1 to review, in 1,284 files.
-PolinRider 3.2.0, indicators last reviewed 16 November 2026.
+PolinRider 3.3.1, indicators last reviewed 16 November 2026.
 
 | Result    | Finding                                                 | File               |
 |-----------|---------------------------------------------------------|--------------------|
@@ -51,7 +51,7 @@ To review, nothing confirmed:
 PolinRider Scanner: to review
 
 Nothing confirmed. 1 to review, in 1,284 files.
-PolinRider 3.2.0, indicators last reviewed 16 November 2026.
+PolinRider 3.3.1, indicators last reviewed 16 November 2026.
 
 | Result    | Finding                                                 | File       |
 |-----------|---------------------------------------------------------|------------|
@@ -86,7 +86,7 @@ The reason is also an error note on the run:
 | ... does not match the SHA-256 this action pins, so it was not run | Do not work around it. Report it on the action's issues page |
 | Could not download ... | GitHub's downloads were unreachable. Run it again |
 | ... does not hold polinrider and its indicators. It was not run. | Report it |
-| polinrider 3.2.0 did not start on this runner ... On Linux it needs glibc 2.39 or later, as on ubuntu-24.04. | Use `ubuntu-24.04` or `ubuntu-latest` |
+| polinrider 3.3.1 did not start on this runner ... On Linux it needs glibc 2.39 or later, as on ubuntu-24.04. | Use `ubuntu-24.04` or `ubuntu-latest` |
 | The archive ... reports version ... It was not run. | Report it |
 | This runner is Windows ... | Use a Linux or macOS runner |
 | action.yml has no SHA-256 for ..., so nothing was downloaded. | That runner is not supported yet |
@@ -131,7 +131,7 @@ puts them in the repository's Security tab:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: meSingh/polinrider-action@8c71848593f0e58416c5f61845b3bd2e8080d438 # v1.0.0
+      - uses: meSingh/polinrider-action@cd105ea591bb6d431aae82c316e2c44409e35d48 # v1.1.0
         with:
           comment: true
           sarif-file: polinrider.sarif

@@ -44,7 +44,7 @@ To act on the verdict in a later step, give the step an `id`:
 
 ```yaml
       - id: polinrider
-        uses: meSingh/polinrider-action@8c71848593f0e58416c5f61845b3bd2e8080d438 # v1.0.0
+        uses: meSingh/polinrider-action@cd105ea591bb6d431aae82c316e2c44409e35d48 # v1.1.0
         with:
           fail-on: never
       - if: steps.polinrider.outputs.verdict == 'review'
