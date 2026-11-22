@@ -42,6 +42,10 @@ What each part does:
 A confirmed finding fails the `scan` job. What the run shows is in
 [Reading the results](/docs/action/results/).
 
+The action checks the commit it runs on. It does not read the repository's
+other branches or older commits: [checking a computer](/docs/guides/machine/)
+does that, where someone can act on what it finds.
+
 ## Pin it by commit SHA
 
 Use the full commit SHA of a release, with its version as a comment. The
@@ -86,6 +90,8 @@ Without this the check is only a warning anyone can merge past.
 
 The check is named after the job. If you rename the job, pick that name. An
 infected push or pull request now cannot merge into the default branch.
+[Block a merge on a finding](/docs/action/require/) has the full ruleset, the
+command-line version and the organization-wide one.
 
 ## Keep the weekly schedule
 

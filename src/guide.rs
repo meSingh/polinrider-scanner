@@ -635,6 +635,7 @@ fn local(
         home: (what == What::Computer).then_some(session.home),
         home_read: true,
         git_all: false,
+        no_git: false,
         host: if what == What::Computer {
             session.host
         } else {
@@ -1924,6 +1925,7 @@ mod tests {
             home: None,
             home_read: true,
             git_all: false,
+            no_git: false,
             host: None,
             on_infected_config: OnInfectedConfig::Report,
             report: None,

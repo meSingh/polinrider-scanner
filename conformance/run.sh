@@ -801,6 +801,8 @@ refusals() {
   check_refusal "--resume alongside --fresh"         check --resume --fresh "$tmp"
   check_refusal "--resume alongside --apply"         check --apply --resume "$tmp"
   check_refusal "clean told to --git-all"            clean --git-all "$tmp"
+  check_refusal "--no-git alongside --git-all"       check --no-git --git-all "$tmp"
+  check_refusal "the guided flow told to --no-git"   guide --no-git
   check_refusal "a root that does not exist" check "$tmp/definitely-absent"
   check_refusal "no root at all"             check --fs-only
   check_refusal "a missing indicator set"    check --ioc "$tmp/no-ioc-here" "$tmp"

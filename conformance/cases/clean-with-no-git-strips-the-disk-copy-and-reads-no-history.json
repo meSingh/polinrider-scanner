@@ -1,0 +1,38 @@
+{
+  "why": "clean with --no-git cuts the payload out of the file on disk and reads no git history (ADR-0073). The commit that carried the payload is not named and not counted, which is what the GitHub Action needs: its fix pull request is a new commit, so the old one is not something left over. The cut file is still a confirmed finding, so the run exits 2 as every clean that found the payload does.",
+  "command": "clean",
+  "apply": true,
+  "roots": [
+    "code/shop"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n"
+          }
+        }
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 2,
+    "tree_may_change": true,
+    "stripped": [
+      "code/shop/postcss.config.mjs"
+    ],
+    "must_print": [
+      "stripped",
+      "original kept ->"
+    ],
+    "must_not_print": [
+      "last commit (main)",
+      "git history"
+    ]
+  },
+  "args": [
+    "--no-git"
+  ]
+}

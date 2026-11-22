@@ -21,6 +21,7 @@
 #   /usr/share/polinrider/ioc/
 #   /usr/share/doc/polinrider-scanner/copyright        the licence
 #   /usr/share/doc/polinrider-scanner/DISCLAIMER.md
+#   /usr/share/man/man1/polinrider.1.gz                the manual page
 #
 # Up to 2.3.0 the package was called polinrider-cleaner. It installed the same
 # files, so the control file says this package Conflicts with and Replaces it
@@ -62,11 +63,15 @@ root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT
 doc="$root/usr/share/doc/polinrider-scanner"
 
-install -d -m 0755 "$root/DEBIAN" "$root/usr/bin" "$root/usr/share/polinrider" "$doc"
+install -d -m 0755 "$root/DEBIAN" "$root/usr/bin" "$root/usr/share/polinrider" "$doc" \
+  "$root/usr/share/man/man1"
 install -m 0755 "$bin" "$root/usr/bin/polinrider"
 cp -R ioc "$root/usr/share/polinrider/ioc"
 install -m 0644 LICENSE "$doc/copyright"
 install -m 0644 DISCLAIMER.md "$doc/DISCLAIMER.md"
+# -n leaves the name and time out of the gzip header, so the package builds the same twice.
+gzip -9n < man/polinrider.1 > "$root/usr/share/man/man1/polinrider.1.gz"
+chmod 0644 "$root/usr/share/man/man1/polinrider.1.gz"
 
 # Modes as policy has them, whatever the checkout's umask left behind. The
 # package root too: mktemp makes it 0700, and that mode is recorded as ./

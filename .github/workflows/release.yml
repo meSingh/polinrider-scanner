@@ -114,7 +114,7 @@ jobs:
 
       - name: Package
         # The binary with its indicators beside it, which is where it looks
-        # for them, plus the licence and the disclaimer. A tar archive on every
+        # for them, plus the manual page, the licence and the disclaimer. A tar archive on every
         # platform: it keeps the executable bit, and Windows 10 and later ship
         # tar.exe.
         env:
@@ -127,7 +127,7 @@ jobs:
           mkdir -p "dist/$dir"
           cp "target/${TARGET}/release/${EXE}" "dist/$dir/"
           cp -R ioc "dist/$dir/ioc"
-          cp LICENSE DISCLAIMER.md "dist/$dir/"
+          cp LICENSE DISCLAIMER.md man/polinrider.1 "dist/$dir/"
           tar -C dist -czf "dist/$dir.tar.gz" "$dir"
 
       - name: Package the Windows zip

@@ -1,0 +1,41 @@
+---
+title: PolinRider Scanner and Cleaner 3.3.1
+description: A --no-git option for a checkout of one commit, as in CI, and a manual page.
+version: "3.3.1"
+# The expected release day. Once the tag exists the site shows the tag's date
+# instead, so this never needs correcting after the release.
+date: "2026-11-22"
+---
+
+import Downloads from '~/components/Downloads.astro';
+import Released from '~/components/Released.astro';
+import RunBlock from '~/components/RunBlock.astro';
+
+<Released version="3.3.1" date="2026-11-22" /> No breaking changes.
+
+## New
+
+- **`--no-git` reads no git history.** The files on disk are checked as
+  before. It is for a fresh checkout of one commit, as in CI, where the files
+  on disk are the last commit and a git finding only repeats them. The
+  [GitHub action](/github-action/) passes it on every run. Accepted by
+  `check` and `clean`, and refused with `--git-all`. Don't use it on a
+  computer you are cleaning: git can still hold the payload there.
+- **A manual page.** `man polinrider` after installing with Homebrew or the
+  `.deb`, and `polinrider.1` in each `.tar.gz` archive. Every command and
+  option is also on one page: [Commands and options](/docs/reference/options/).
+
+## Breaking changes
+
+None. Exit codes, commands and flags are as in the previous release.
+
+## Download
+
+<Downloads version="3.3.1" packages />
+
+Or use a package manager. Choose your system, then run only its commands:
+
+<RunBlock />
+
+[Verify what you downloaded](/docs/reference/verifying/) before
+you run it.

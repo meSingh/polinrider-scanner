@@ -20,6 +20,7 @@ export const groups: { label: string; items: [string, string][] }[] = [
     label: 'Install and run',
     items: [
       ['quick-start', 'Quick start'],
+      ['reference/options', 'Commands and options'],
       ['reference/verifying', 'Verifying this repository'],
       ['reference/verifying-before-3', 'Verifying releases from before 3.0'],
     ],
@@ -55,6 +56,7 @@ export const groups: { label: string; items: [string, string][] }[] = [
     items: [
       ['guides/ci', 'Every future push'],
       ['action/setup', 'Set up the GitHub action'],
+      ['action/require', 'Block a merge on a finding'],
       ['action/inputs', 'Inputs and permissions'],
       ['action/fix-mode', 'Fix mode'],
       ['action/results', 'Reading the results'],
