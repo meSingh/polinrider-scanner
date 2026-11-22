@@ -97,6 +97,8 @@ as a backup kept from a history rewrite, are read the same way.
   time limit.
 - If git is not installed, the report says the history was not read. It is
   never passed over in silence.
+- `--no-git` reads no history at all. It is for a checkout of one commit, as
+  in CI. Don't use it on a computer you are cleaning.
 
 ## What changes, and when
 

@@ -1,0 +1,36 @@
+{
+  "why": "With --no-git no git history is read (ADR-0073). This is the repository whose last commit holds the payload while the file on disk is clean, confirmed by default (git-last-commit-carries-the-payload-the-disk-does-not-is-confirmed). The flag is for a checkout whose files are its last commit, as in CI, where that finding only repeats the file checks. The disk is clean, so the folder is clean, exit 0, and no git line is printed: the caller asked for history to be left unread.",
+  "roots": [
+    "code"
+  ],
+  "git": [
+    {
+      "dir": "code/shop",
+      "commits": [
+        {
+          "files": {
+            "postcss.config.mjs": "export default { plugins: {} }\n{{PAD}}{{STRONG}}\n",
+            "src/index.js": "export const a = 1\n"
+          }
+        }
+      ]
+    }
+  ],
+  "files": {
+    "code/shop/postcss.config.mjs": "export default { plugins: {} }\n"
+  },
+  "expect": {
+    "exit": 0,
+    "tree_may_change": false,
+    "findings": [],
+    "must_not_print": [
+      "git repository",
+      "holds the payload",
+      "last commit (main)",
+      "git history"
+    ]
+  },
+  "args": [
+    "--no-git"
+  ]
+}

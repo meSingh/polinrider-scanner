@@ -163,6 +163,7 @@ fn main() -> ProcExit {
         // named with --home is part of the disk being checked. ADR-0069.
         home_read: !args.fs_only || args.home_named,
         git_all: args.git_all,
+        no_git: args.no_git,
         host,
         on_infected_config: if clean {
             OnInfectedConfig::Strip
@@ -257,6 +258,9 @@ fn check_options(args: &cli::Args) -> Vec<String> {
     let mut options = vec![host, format!("home {}", args.home.display())];
     if args.git_all {
         options.push("git-all".into());
+    }
+    if args.no_git {
+        options.push("no-git".into());
     }
     options
 }

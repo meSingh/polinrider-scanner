@@ -31,6 +31,8 @@ pub struct Scope<'a> {
     pub home_read: bool,
     /// Read every commit and object of each git repository. ADR-0068.
     pub git_all: bool,
+    /// Read no git history: the files on disk are the last commit. ADR-0073.
+    pub no_git: bool,
     /// The machine, when its live state is to be read. `None` skips the host
     /// checks and says so.
     pub host: Option<&'a dyn Host>,
@@ -355,18 +357,21 @@ fn steps(scope: &Scope, sink: &mut Sink, s: &mut Stream, v: &mut Verdict) {
         v.set_skipped(skipped);
     }
     s.flush(v);
-    // What git would put back. Read by git, never changed. ADR-0068.
-    crate::git_local::history(
-        &w,
-        ind,
-        crate::git_local::Options {
-            all: scope.git_all,
-            budget: Some(crate::git_local::BUDGET),
-            program: "git",
-        },
-        v,
-        &mut |n, of| s.repos(n, of),
-    );
+    // What git would put back. Read by git, never changed. ADR-0068. Not
+    // read at all with --no-git (ADR-0073).
+    if !scope.no_git {
+        crate::git_local::history(
+            &w,
+            ind,
+            crate::git_local::Options {
+                all: scope.git_all,
+                budget: Some(crate::git_local::BUDGET),
+                program: "git",
+            },
+            v,
+            &mut |n, of| s.repos(n, of),
+        );
+    }
     // The home directory is swept only when this machine is being read. A
     // disk checked with --fs-only gets the .env count and nothing more.
     checks::credentials(&w, host.and(scope.home), v);

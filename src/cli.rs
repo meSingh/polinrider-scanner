@@ -51,6 +51,10 @@ pub const ACCEPTED: &[(&str, &str)] = &[
         "also read every commit and object git keeps. Slower",
     ),
     (
+        "--no-git",
+        "do not read git history. The files on disk are still checked",
+    ),
+    (
         "--ioc DIR",
         "indicator set. Defaults to ioc/ beside the binary",
     ),
@@ -258,6 +262,9 @@ pub struct Args {
     /// Read every commit and object of each git repository, not only what a
     /// checkout can bring back. ADR-0068.
     pub git_all: bool,
+    /// Read no git history at all, for a checkout whose files are its last
+    /// commit, as in CI. ADR-0073.
+    pub no_git: bool,
 }
 
 /// Parse and validate. Returns only arguments it is safe to act on.
@@ -275,7 +282,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
     let mut scope_flags: Vec<(String, Option<String>)> = Vec::new();
     let (mut forge_state, mut evidence) = (None, None);
     let (mut resume, mut fresh) = (false, false);
-    let mut git_all = false;
+    let (mut git_all, mut no_git) = (false, false);
 
     // The subcommand, when present. `check` is the default.
     let command = match args.peek().map(String::as_str) {
@@ -359,6 +366,11 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
                 )?;
                 scope_flags.push(("--git-all".into(), None));
                 git_all = true;
+            }
+            "--no-git" => {
+                not_for("--no-git", &[Command::Guide, Command::PurgeEvidence])?;
+                scope_flags.push(("--no-git".into(), None));
+                no_git = true;
             }
             "--report" => {
                 not_for_purge("--report")?;
@@ -513,6 +525,14 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         });
     }
 
+    if no_git && git_all {
+        return Err(Rejection::Conflict {
+            first: "--no-git".into(),
+            second: "--git-all".into(),
+            why: "one reads no git history and the other reads all of it".into(),
+        });
+    }
+
     if let Some(dir) = &host_state {
         if fs_only {
             return Err(Rejection::Conflict {
@@ -546,6 +566,7 @@ pub fn parse<I: Iterator<Item = String>>(argv: I, default_ioc: PathBuf) -> Resul
         resume,
         fresh,
         git_all,
+        no_git,
     })
 }
 
@@ -592,7 +613,7 @@ pub fn usage() -> String {
     for (flag, help) in ACCEPTED {
         s.push_str(&format!("  {flag:<18} {help}\n"));
     }
-    s.push_str("\nclean takes --apply, --quarantine, --report and --ioc. It never changes git:\nnothing is staged, committed, reset or stashed. It reads each repository's\nhistory and says when git still holds the payload. The original of every file\nit changes is kept in quarantine.\n");
+    s.push_str("\nclean takes --apply, --quarantine, --report, --ioc and --no-git. It never\nchanges git: nothing is staged, committed, reset or stashed. It reads each\nrepository's history and says when git still holds the payload, unless given\n--no-git. The original of every file it changes is kept in quarantine.\n");
     s.push_str("\nExit codes: 0 clean - 1 review items only - 2 a confirmed indicator\n            3 the scan could not run.\n");
     s
 }
@@ -876,6 +897,47 @@ mod tests {
     }
 
     #[test]
+    fn every_flag_is_in_the_manual_page_and_on_the_options_page() {
+        // The man page writes a hyphen as \-.
+        let man = include_str!("../man/polinrider.1").replace("\\-", "-");
+        let page = include_str!("../docs-site/src/content/docs/reference/options.md");
+        for (flags, _) in ACCEPTED {
+            for flag in flags.split(", ") {
+                let flag = flag.split(' ').next().unwrap_or(flag);
+                assert!(
+                    man.contains(flag),
+                    "man/polinrider.1 does not mention {flag}"
+                );
+                assert!(
+                    page.contains(flag),
+                    "the options page does not mention {flag}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn no_git_is_for_a_check_and_a_clean_and_not_with_git_all() {
+        let ioc = ioc_fixture("no-git");
+        for argv in [vec!["--no-git", "/tmp"], vec!["clean", "--no-git", "/tmp"]] {
+            let a = parse(args(&argv).into_iter(), ioc.clone()).expect("ok");
+            assert!(a.no_git && !a.git_all, "{argv:?}");
+            assert!(a
+                .scope_flags
+                .iter()
+                .any(|(flag, value)| flag == "--no-git" && value.is_none()));
+        }
+        let e = parse(args(&["guide", "--no-git"]).into_iter(), ioc.clone()).expect_err("refuse");
+        assert!(matches!(e, Rejection::NotForCommand { .. }), "{e:?}");
+        let e =
+            parse(args(&["--no-git", "--git-all", "/tmp"]).into_iter(), ioc).expect_err("refuse");
+        assert!(matches!(e, Rejection::Conflict { .. }), "{e:?}");
+        assert!(usage().contains(
+            "  --no-git           do not read git history. The files on disk are still checked\n"
+        ));
+    }
+
+    #[test]
     fn git_all_is_for_a_check() {
         let ioc = ioc_fixture("git-all");
         let a = parse(args(&["--git-all", "/tmp"]).into_iter(), ioc.clone()).expect("ok");
@@ -897,7 +959,7 @@ mod tests {
         assert!(usage().contains(
             "  --git-all          also read every commit and object git keeps. Slower\n"
         ));
-        assert!(usage().contains("It never changes git:"));
+        assert!(usage().contains("It never\nchanges git:"));
     }
 
     #[test]

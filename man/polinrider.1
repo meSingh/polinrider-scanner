@@ -1,0 +1,236 @@
+.\" polinrider(1). Every flag in ACCEPTED in src/cli.rs must appear here;
+.\" a test in src/cli.rs fails when one does not. The website's
+.\" docs-site/src/content/docs/reference/options.md says the same at length.
+.TH POLINRIDER 1 "" "polinrider" "User Commands"
+.SH NAME
+polinrider \- find and clean up after the PolinRider supply-chain campaign
+.SH SYNOPSIS
+.B polinrider
+.br
+.B polinrider check
+.RI [ options ]
+.IR ROOT ...
+.br
+.B polinrider clean
+.RI [ options ]
+.IR REPO ...
+.br
+.B polinrider guide
+.RI [ options ]
+.br
+.B polinrider \-\-purge\-evidence
+.RB [ \-\-evidence
+.IR DIR ]
+.SH DESCRIPTION
+.B polinrider
+checks a computer, a folder or a disk for the PolinRider campaign: the
+payload appended to build configs, editor tasks that run on folder open, fake
+fonts, known-bad packages and hijacked releases, what starts by itself, and
+the
+.B MicrosoftSystem64
+implant. It also reads the git history of each repository it finds.
+.PP
+It reports unless told to act. Nothing is ever deleted: with
+.B \-\-apply
+confirmed files are moved into a quarantine folder that says how to put them
+back.
+.PP
+An option a command cannot use is refused, never ignored. The run stops with
+exit status 3 and nothing is scanned.
+.SH COMMANDS
+.TP
+.B polinrider
+The guided flow. Asks what to check, one question at a time, and changes
+something only when you type
+.BR yes .
+.TP
+.B guide
+The same guided flow, spelled out so it can take options.
+.TP
+.BI check " ROOT..."
+Scan the folders given and this computer, and report. A line with folders and
+no command is a
+.BR check .
+.TP
+.BI clean " REPO..."
+Scan the folders given. With
+.BR \-\-apply ,
+also cut a payload appended to a build config out of the file in place,
+keeping the infected original in quarantine. Never changes git.
+.TP
+.B \-\-purge\-evidence
+Delete the copies of GitHub repositories the guided flow kept, after a typed
+.BR yes .
+Nothing else is deleted.
+.SH OPTIONS
+.SS What to scan
+.TP
+.B \-\-fs\-only
+Only the folders given. Reads nothing of this computer: no processes, live
+connections, crontab, startup items, editor or app startup files, and no home
+folder unless one is named with
+.BR \-\-home .
+Git history inside the folders is still read.
+.B check
+only. Cannot be used with
+.BR \-\-host\-state .
+.TP
+.BI \-\-home " DIR"
+The home folder to check. Default: the home folder of the user running
+.BR polinrider ,
+or none under
+.BR \-\-fs\-only .
+Reports and quarantine folders go here by default too.
+.B check
+and the guided flow.
+.TP
+.BI \-\-host\-state " DIR"
+Read processes, sockets and crontab from files in
+.IR DIR ,
+not from this computer.
+.B check
+and the guided flow. Cannot be used with
+.BR \-\-fs\-only .
+.SS Git history
+By default each repository found is read: the last commit, the staged files,
+every branch, remote branch and tag, and every stash, with at most two minutes
+per repository. Git is read, never changed.
+.TP
+.B \-\-git\-all
+Also read every earlier commit and every object git keeps. Slower, with no
+time limit.
+.B check
+only. Cannot be used with
+.BR \-\-no\-git .
+.TP
+.B \-\-no\-git
+Read no git history. The files on disk, git hooks included, are checked as
+before. For a fresh checkout of one commit, as in CI. Never use it on a
+computer being cleaned: git can still hold the payload.
+.B check
+and
+.BR clean .
+Cannot be used with
+.BR \-\-git\-all .
+.SS Changing things
+.TP
+.B \-\-apply
+Act on what is confirmed. With
+.BR check ,
+move each confirmed file into quarantine; it never edits a file. With
+.BR clean ,
+also cut an appended payload out of a build config. Never deletes a file and
+never changes git, a crontab, a shell startup file, a profile, a Run entry or
+a scheduled task.
+.B check
+and
+.BR clean .
+Cannot be used with
+.BR \-\-resume .
+.TP
+.BI \-\-quarantine " DIR"
+Where moved files go, with a
+.B manifest.tsv
+and a
+.BR RESTORE.txt .
+Default: a new
+.BI polinrider\-quarantine\- DATE
+folder in the home folder. Keep it outside the folders being scanned and
+outside any git checkout.
+.SS The report
+.TP
+.BI \-\-report " FILE"
+Write the full report here. Default:
+.BI polinrider\-report\- DATE .txt
+in the home folder. Written as the scan goes, so a stopped scan keeps what it
+found.
+.SS Long scans
+A
+.B check
+saves its place every 5,000 files of step 2. Run the same command again and
+it asks whether to continue.
+.TP
+.B \-\-resume
+Continue a stopped check without asking. Only when the version, indicators,
+folders and options are the same.
+.B check
+only. Cannot be used with
+.B \-\-fresh
+or
+.BR \-\-apply .
+.TP
+.B \-\-fresh
+Start again without asking.
+.B check
+only. Cannot be used with
+.BR \-\-resume .
+Accepted with
+.BR \-\-apply ,
+which always starts again.
+.SS Indicators
+.TP
+.BI \-\-ioc " DIR"
+The indicator set. Default: the
+.B ioc
+folder beside the binary, or
+.B share/polinrider/ioc
+above it. Needs
+.IR DIR /strong.txt.
+A set that is missing or cannot be read stops the run with exit status 3
+before any file is read.
+.SS The guided flow and GitHub
+.TP
+.BI \-\-evidence " DIR"
+Where the guided flow keeps copies of GitHub repositories. Default:
+.B polinrider\-evidence
+in the system's temporary folder. Refused inside a git checkout.
+.TP
+.BI \-\-forge\-state " DIR"
+Read GitHub's answers from files in
+.IR DIR ,
+not from GitHub. Guided flow only.
+.SS Information
+.TP
+.BR \-V ", " \-\-version
+The version, the commit it was built from and the indicator counts.
+.TP
+.BR \-h ", " \-\-help
+The short list of commands and options.
+.SH EXIT STATUS
+.TP
+.B 0
+Clean against the current indicator set. Not proof: signatures rotate.
+.TP
+.B 1
+Review items only. Nothing confirmed.
+.TP
+.B 2
+A confirmed indicator.
+.TP
+.B 3
+The scan could not run, including every refused option. Says nothing about
+whether you are infected.
+.SH EXAMPLES
+Check this computer and a folder, changing nothing:
+.PP
+.RS
+.B polinrider check ~/code
+.RE
+.PP
+Check a backup drive and nothing of this computer:
+.PP
+.RS
+.B polinrider check \-\-fs\-only /Volumes/Backup
+.RE
+.PP
+Clean the repositories in a folder, keeping every original in quarantine:
+.PP
+.RS
+.B polinrider clean \-\-apply ~/code
+.RE
+.SH SEE ALSO
+.BR git (1)
+.PP
+Every option at length: https://polinriderscanner.com/docs/reference/options/
+.PP
+Source and releases: https://github.com/meSingh/polinrider-scanner
