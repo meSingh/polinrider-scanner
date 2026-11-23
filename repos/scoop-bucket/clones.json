@@ -78,5 +78,10 @@
     "timestamp": "2026-11-21T00:00:00Z",
     "count": 40,
     "uniques": 21
+  },
+  {
+    "timestamp": "2026-11-22T00:00:00Z",
+    "count": 10,
+    "uniques": 8
   }
 ]
