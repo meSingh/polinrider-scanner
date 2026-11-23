@@ -44,3 +44,14 @@ aa01a83c7a420c22a719b02ec327451ddd751ab5b189fd0127824ea43533b96a  ulid-xyz utils
 284d167f51c93b90100b7faeaec971959c1f8bb642e7ea0de50190a5a306f3d8  .vscode/tasks.json that runs fa-solid-300.ttf on folder open
 7ba0a30eabfa46008d6417532533199bbf351b27f3841477e9133f43fb404d24  fake font public/fonts/fa-solid-300.ttf
 b59e598ded824c7318ca9fae4e9a6d98c9600873677ece7d9896870e3e7ced8e  api.js with the loader after whitespace
+
+# --- the two webpack.config.js files of the 2025-05-04 npm burst that carry
+# the payload line, from OpenSourceMalware's hash list, 2026-10-30. Both
+# tarballs are still served by npm; they were fetched on 2026-11-23 and the
+# files hash to these values. A build config is hashed wherever it lies
+# outside node_modules, so these find a vendored or copied file; the
+# index.js files and tarballs on the same list are not read by any check and
+# are not carried.
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+489df9fa032455af30066af90404285cab7191823ef6770c691b9ef8bb84c16f  itsa-react-button 16.0.11 webpack.config.js with the payload line
+8c934e6fd9f689d60233bbec4370896778f6b286e9d00df7e94afd6dc9f44cc4  itsa-react-docviewer 16.1.2 webpack.config.js with the payload line

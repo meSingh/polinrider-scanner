@@ -406,10 +406,10 @@ weeks that found nothing. Each review keeps its own dated entry, and entries are
 never edited or removed:
 [the indicator reviews](https://polinriderscanner.com/indicator-reviews/).
 
-**Last reviewed: [16 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-16/).**
+**Last reviewed: [23 November 2026](https://polinriderscanner.com/indicator-reviews/2026-11-23/).**
 
-38 indicators added: a third operator wallet, its C2 addresses and the files and markers
-of a second stage that patches npm and the editor so it runs again after a cleanup.
+61 indicators added: 53 hijacked releases of real npm packages, by name and version, and the
+marker of two 2026 loader variants that reached review only. Nothing new was published this week.
 
 From 2.3.0, the folder and computer checks read `weak.txt` too (ADR-0047).
 Up to 2.2.0, review-tier indicators reach only the CI scanner and the GitHub

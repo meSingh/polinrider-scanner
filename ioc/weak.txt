@@ -134,3 +134,15 @@ logger-active
 /0x/clb
 /0x/cb
 /0x/npm-migrate
+
+# The script prefix the worm adds to dev, build or lint in package.json: it
+# runs a dropper file named init, then the project's real command, so nothing
+# breaks. Review tier: node resolves init to a project's own init.js, so a
+# legitimate script can read the same way. Abnormal AI's report of 2026-11-12
+# also names an extensionless init file; the name alone is too ordinary for
+# any tier.
+# Source: Glover (dev.to/_itsglover), "How a worm got into our repos, and why we built
+# repo-guard", 2026-11-21 (a first-person account of an infection
+# found on 2026-11-18).
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+node init &&

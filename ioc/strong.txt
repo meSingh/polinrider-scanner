@@ -207,3 +207,18 @@ ThZG+0jfXE6VAGOJ
 # Source: JFrog Security Research, "Contagious Interview: One Interview Away
 # From Infection", November 2026.
 accurasofthire.com
+
+# The campaign-marker assignment of the "5-" builds on global.i, beside
+# global.o='5- above. The loaders force-pushed into four of one maintainer's
+# repositories on 2026-01-22, 2026-03-23 and 2026-05-29 open, after 709 or
+# 2,784 spaces at the end of webpack.config.js, with global.i='5-55'; and
+# then a _$_ string table. The source prints the marker; the spelling here
+# was read in six of the infected files at the commits the source lists,
+# which GitHub still served on 2026-11-23. Before this entry those files
+# reached review only: the pattern for the global.i tag needs an A-numbered
+# value. The counter is dropped as it is for global.o. Nothing legitimate
+# assigns a string beginning "5-" to global.i.
+# Source: OpenSourceMalware, "Earliest Known PolinRider Malware Found in 2025
+# npm Packages", 2026-10-30 (variants B and B2).
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+global.i='5-
