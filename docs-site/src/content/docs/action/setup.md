@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: meSingh/polinrider-action@8c71848593f0e58416c5f61845b3bd2e8080d438 # v1.0.0
+      - uses: meSingh/polinrider-action@cd105ea591bb6d431aae82c316e2c44409e35d48 # v1.1.0
 ```
 
 What each part does:
@@ -55,11 +55,11 @@ GitHub guarantees cannot change. The
 each release. To read a release's SHA from the command line:
 
 ```bash
-gh api repos/meSingh/polinrider-action/commits/v1.0.0 --jq .sha
+gh api repos/meSingh/polinrider-action/commits/v1.1.0 --jq .sha
 ```
 
 The release notes of each version name the polinrider version it runs.
-v1.0.0 runs polinrider 3.2.0.
+v1.1.0 runs polinrider 3.3.1.
 
 ## Let Dependabot move the pin
 
