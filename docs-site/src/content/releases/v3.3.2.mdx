@@ -1,0 +1,49 @@
+---
+title: PolinRider Scanner and Cleaner 3.3.2
+description: The indicators of the 23 November review, including 53 hijacked releases of real npm packages and two loader variants that used to reach review only.
+version: "3.3.2"
+# The expected release day. Once the tag exists the site shows the tag's date
+# instead, so this never needs correcting after the release.
+date: "2026-11-24"
+---
+
+import Downloads from '~/components/Downloads.astro';
+import Released from '~/components/Released.astro';
+import RunBlock from '~/components/RunBlock.astro';
+
+<Released version="3.3.2" date="2026-11-24" /> No breaking changes.
+
+## New
+
+- **The indicators of the [23 November review](/indicator-reviews/2026-11-23/).**
+  61 added. No code changed.
+- **53 hijacked releases of real npm packages are found by name and
+  version.** A project that pins one of them, in `package.json`, a lockfile
+  or `node_modules`, is reported as infected. The clean releases of the same
+  packages are not reported.
+- **Two loader variants are confirmed.** Build configs that open the
+  payload with `global.i='5-` used to be listed for review only. They now
+  exit 2.
+- Two more server addresses, two lock file paths, two file hashes and one
+  review-only `package.json` script prefix (`node init &&`).
+
+## Changed
+
+- A folder that 3.3.1 called clean, or listed for review, can now come back
+  as infected, with exit code 2. That is these indicators being found, not a
+  change to what the exit codes mean.
+
+## Breaking changes
+
+None. Exit codes, commands and flags are as in the previous release.
+
+## Download
+
+<Downloads version="3.3.2" packages />
+
+Or use a package manager. Choose your system, then run only its commands:
+
+<RunBlock />
+
+[Verify what you downloaded](/docs/reference/verifying/) before
+you run it.
