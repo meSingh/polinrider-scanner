@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: meSingh/polinrider-action@cd105ea591bb6d431aae82c316e2c44409e35d48 # v1.1.0
+      - uses: meSingh/polinrider-action@de52596b9ced60ae70152745d03fa5c36464d329 # v1.1.1
 ```
 
 Then make `scan` a required check and let Dependabot move the pin.
