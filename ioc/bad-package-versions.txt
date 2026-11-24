@@ -31,3 +31,99 @@
 cdeops@13.5.31
 server-hemera-mongo@0.0.15
 server-hemera-mongo@0.0.16
+
+# --- the nine-version burst of 2025-05-04 from one maintainer's npm account
+# (ItsAsbreuk), the earliest known PolinRider payload: a line appended to
+# index.js or webpack.config.js after 253 or 1,012 whitespace characters,
+# opening global['_V']='5-itsa'. Clean replacements followed the next morning
+# (itsa-utils 1.4.3 and six more), so these are real packages with one
+# hijacked release each. Seven of the nine are carried: the three still
+# served by npm on 2026-11-23, whose tarballs were fetched and whose hashes
+# match the source's (itsa-jsext, itsa-react-docviewer, itsa-react-button),
+# and the four npm has withdrawn that a MAL record names. itsa-cli@16.5.3 and
+# itsa-react-input@16.1.2 are NOT carried: npm has withdrawn both, the source
+# says it could not read either, and no MAL record names them.
+# Sources: OpenSourceMalware, "Earliest Known PolinRider Malware Found in 2025
+# npm Packages", 2026-10-30; OpenSSF malicious-packages MAL-2026-18363
+# (itsa-utils), MAL-2026-18360 (itsa-react-checkbox), MAL-2026-17910
+# (itsa-react-focuscontainer), MAL-2026-17911 (itsa-react-maskedinput).
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+itsa-utils@1.4.2
+itsa-jsext@2.0.3
+itsa-react-docviewer@16.1.2
+itsa-react-button@16.0.11
+itsa-react-maskedinput@16.1.2
+itsa-react-checkbox@16.0.5
+itsa-react-focuscontainer@16.0.10
+
+# --- @common-stack/generate-plugin, hijacked from 2026-05-21 to 2026-06-08:
+# the first-generation loader (decoder seed rmcej%otb%, Tron dead drop)
+# appended to postcss.config.js, run at install time. The package is the same
+# project's as the @adminide-stack releases above, five months earlier. npm
+# has withdrawn all fifteen and serves the releases between them
+# (registry.npmjs.org, 2026-11-23).
+# Sources: Sonatype, "Hijacked npm Package Attempts to Deliver PolinRider-Linked
+# RAT", 2026-05-21, updated 2026-06-04 (9.0.2-alpha.21 and 9.0.2-alpha.22 by
+# name, thirteen by count); OpenSSF malicious-packages MAL-2026-5546 (all
+# fifteen; GitHub, Amazon Inspector).
+@common-stack/generate-plugin@9.0.2-alpha.21
+@common-stack/generate-plugin@9.0.2-alpha.22
+@common-stack/generate-plugin@9.0.2-alpha.23
+@common-stack/generate-plugin@9.0.2-alpha.24
+@common-stack/generate-plugin@9.0.4-alpha.0
+@common-stack/generate-plugin@9.0.4-alpha.1
+@common-stack/generate-plugin@9.0.5-alpha.0
+@common-stack/generate-plugin@9.0.5-alpha.1
+@common-stack/generate-plugin@9.0.5-alpha.2
+@common-stack/generate-plugin@9.0.5-alpha.3
+@common-stack/generate-plugin@9.0.5-alpha.4
+@common-stack/generate-plugin@9.0.5-alpha.5
+@common-stack/generate-plugin@9.0.6-alpha.0
+@common-stack/generate-plugin@9.0.6-alpha.1
+@common-stack/generate-plugin@10.0.1-alpha.0
+
+# --- releases of real packages published from an infected maintainer's
+# machine, May to October 2026. Earlier reviews found each record and left the
+# name out of bad-packages.txt because the package is real; this list did not
+# exist then. Every record below was read on 2026-11-23 and itself describes
+# the campaign's loader: the 0xa322 Ethereum dead drop for all but
+# html-to-gutenberg, whose record describes the api.js loader and the fake
+# font. Every version listed is withdrawn from npm and every package still
+# serves clean releases (registry.npmjs.org, 2026-11-23). html-to-gutenberg
+# 4.2.23 is not in its record and is not carried.
+# Sources: OpenSSF malicious-packages MAL-2026-6358 (fetch-page-assets),
+# MAL-2026-6359 (html-to-gutenberg), MAL-2026-13722 (fsbrowse), MAL-2026-13723
+# (godot-kit), MAL-2026-13938 (@kolbo/mcp), MAL-2026-14367 to MAL-2026-14369
+# (@syncraft-labs/core, /react, /vue; campaign tag A12-synd), MAL-2026-14539
+# (zenntechinc-cli). All reported by Amazon Inspector.
+fetch-page-assets@1.2.9
+fetch-page-assets@1.2.10
+fetch-page-assets@1.2.11
+fetch-page-assets@1.2.12
+fetch-page-assets@1.2.13
+fetch-page-assets@1.2.14
+fetch-page-assets@1.2.15
+fetch-page-assets@1.2.16
+html-to-gutenberg@4.2.11
+html-to-gutenberg@4.2.12
+html-to-gutenberg@4.2.13
+html-to-gutenberg@4.2.14
+html-to-gutenberg@4.2.15
+html-to-gutenberg@4.2.16
+html-to-gutenberg@4.2.17
+html-to-gutenberg@4.2.18
+html-to-gutenberg@4.2.19
+html-to-gutenberg@4.2.20
+html-to-gutenberg@4.2.21
+html-to-gutenberg@4.2.22
+html-to-gutenberg@4.2.24
+html-to-gutenberg@4.2.25
+html-to-gutenberg@4.2.26
+fsbrowse@0.2.28
+godot-kit@1.0.1786316795
+@kolbo/mcp@1.57.1
+@syncraft-labs/core@0.4.1
+@syncraft-labs/react@0.4.1
+@syncraft-labs/vue@0.4.1
+zenntechinc-cli@1.6.4
+zenntechinc-cli@1.6.6

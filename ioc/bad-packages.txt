@@ -417,3 +417,8 @@ tailwindcss-form-styles
 # carried here as names: they are a real project's packages, and only certain
 # releases were hijacked. They are in bad-package-versions.txt by name and
 # version. ADR-0063.
+# 2026-11-23: of the hijacked releases recorded in comments above, the itsa-*
+# releases (seven of them), and html-to-gutenberg, fetch-page-assets and
+# @common-stack/generate-plugin from earlier reviews, are now in
+# bad-package-versions.txt by name and version. The rest of Socket's list is
+# not: see docs-site/src/content/docs/indicator-reviews/2026-11-23.md.

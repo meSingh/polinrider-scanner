@@ -71,3 +71,14 @@
 ~/.node_modules/.npm-ws.json
 ~/.node_modules/.npm-ws.pid
 ~/.node_modules/.npm-ws.log
+
+# --- the single-instance lock file of the Python stealer in the 2025 chain,
+# one digit from tmp7A863DD1.tmp above. /tmp/.npm and %USERPROFILE%\.npm, the
+# stealer's staging folders, are deliberately absent: the first is a common
+# npm cache setting in container builds and the second is npm's own cache
+# folder name. ~/.node_modules and ~/.pyenv, from the same list, are ordinary.
+# Source: OpenSourceMalware, "Earliest Known PolinRider Malware Found in 2025
+# npm Packages", 2026-10-30 ("Local artifacts").
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+/tmp/tmp7A863DD6.tmp
+%LOCALAPPDATA%\Temp\tmp7A863DD6.tmp

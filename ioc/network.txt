@@ -110,3 +110,15 @@ copilot-ai.whisdev.org
 # Source: JFrog Security Research, "Contagious Interview: One Interview Away
 # From Infection", November 2026.
 accurasofthire.com
+
+# --- the 2025 chain: the Socket.IO remote-access server (port 3306) and the
+# two upload servers (port 27017) of the stages the itsa-* npm releases of
+# 2025-05-04 fetch. The chain's bootstrap server, 154.91.0.103, is already
+# above. The stages are read from fixed blockchain transactions that are
+# still there, so a lockfile that pins one of those releases still reaches
+# these addresses.
+# Source: OpenSourceMalware, "Earliest Known PolinRider Malware Found in 2025
+# npm Packages", 2026-10-30.
+# See docs-site/src/content/docs/indicator-reviews/2026-11-23.md.
+85.239.62.36
+85.239.60.213
