@@ -43,13 +43,13 @@ before 2026-11-05,windows-x86_64.zip,25,0,25
 2026-11-16,source.tar.gz,204,0,204
 2026-11-16,windows-x86_64.tar.gz,4,0,4
 2026-11-16,windows-x86_64.zip,45,0,45
-2026-11-23,checksums and attestations,15,0,15
+2026-11-23,checksums and attestations,18,0,18
 2026-11-23,linux-arm64.deb,1,0,1
 2026-11-23,linux-arm64.tar.gz,9,0,9
 2026-11-23,linux-x86_64.deb,2,0,2
-2026-11-23,linux-x86_64.tar.gz,23,0,23
-2026-11-23,macos-arm64.tar.gz,8,0,8
+2026-11-23,linux-x86_64.tar.gz,54,0,54
+2026-11-23,macos-arm64.tar.gz,10,0,10
 2026-11-23,macos-x86_64.tar.gz,5,0,5
-2026-11-23,source.tar.gz,62,0,62
+2026-11-23,source.tar.gz,113,0,113
 2026-11-23,windows-x86_64.tar.gz,1,0,1
-2026-11-23,windows-x86_64.zip,16,0,16
+2026-11-23,windows-x86_64.zip,85,0,85
