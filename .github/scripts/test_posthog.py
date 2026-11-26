@@ -6,7 +6,8 @@
 testdata/traffic/ is a slice of the traffic branch as it was on 2026-11-21:
 the views and clones from 1 November, the last five days of stars, two days
 of referrers and paths and the whole downloads/ ledger, plus made-up rows
-for the tap (repos/) and the action's users. To run the same checks against
+for the tap (repos/), the action's users and our own checkouts
+(clones-ours.csv). To run the same checks against
 the whole branch as it is now:
 
     git worktree add /tmp/traffic origin/traffic
@@ -161,13 +162,25 @@ class FixtureOnly(unittest.TestCase):
 
     def test_other_repositories_and_action_users(self):
         events = posthog.build(FIXTURE)
-        tap = [e for e in events if e["properties"].get("repo") == "meSingh/homebrew-tap"]
+        tap = [e for e in events if e["properties"].get("repo") == "meSingh/homebrew-tap"
+               and e["event"] in ("github_views", "github_clones")]
         self.assertEqual(sorted((e["event"], e["properties"]["day"], e["properties"]["count"]) for e in tap),
                          [("github_clones", "2026-11-19", 7), ("github_views", "2026-11-19", 4),
                           ("github_views", "2026-11-20", 0)])
         users = {e["properties"]["day"]: (e["properties"]["repositories"], e["properties"]["files"])
                  for e in events if e["event"] == "github_action_users"}
         self.assertEqual(users, {"2026-11-20": (0, 0), "2026-11-21": (2, 3)})
+
+    def test_clones_by_others_take_our_checkouts_off(self):
+        got = sorted((e["properties"]["repo"], e["properties"]["day"], e["properties"]["clones"],
+                      e["properties"]["ours"], e["properties"]["others"])
+                     for e in posthog.build(FIXTURE) if e["event"] == "github_clones_by_others")
+        # The scanner only on the days clones-ours.csv has, never below zero
+        # (40 of ours against 34 clones on the 18th); the tap, which runs no
+        # workflow, on every day.
+        self.assertEqual(got, [("meSingh/homebrew-tap", "2026-11-19", 7, 0, 7),
+                               ("meSingh/polinrider-scanner", "2026-11-17", 66, 22, 44),
+                               ("meSingh/polinrider-scanner", "2026-11-18", 34, 40, 0)])
 
     def test_a_revised_count_keeps_its_uuid(self):
         with tempfile.TemporaryDirectory() as tmp:

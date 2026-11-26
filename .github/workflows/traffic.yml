@@ -24,6 +24,10 @@
 # notice), and counts the public repositories whose workflows use the action,
 # by code search, into action-users.csv.
 #
+# It counts our own workflows' checkouts per day, so that clones by others
+# can be told from ours, and writes the monthly and all-time totals of
+# release downloads and clones by others under reach/ (ADR-0074).
+#
 # Last, it sends a copy of the numbers to PostHog, one event per day per
 # thing, where they sit beside the website's (.github/scripts/posthog.py,
 # ADR-0066). The branch stays the permanent record. Without the
@@ -300,6 +304,63 @@ jobs:
             echo "Recorded downloads for $today on the $BRANCH branch."
           fi
           cat "$work/new/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      # Our own workflows' checkouts per day, so that other people's clones
+      # can be told from ours (.github/scripts/checkouts.py), then the
+      # monthly and all-time totals of downloads and clones by others
+      # (.github/scripts/reach.py, ADR-0074), in one commit. Counting
+      # checkouts reads the runs of this repository and the action with
+      # TRAFFIC_TOKEN; without it the totals are still written from the
+      # checkouts already counted.
+      - name: Record our own clones and the monthly totals
+        if: ${{ !cancelled() && steps.script.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          api() { GH_TOKEN="$WRITE_TOKEN" gh api "$@"; }
+          work="$RUNNER_TEMP/reach"
+          mkdir -p "$work/data" "$work/out"
+
+          head=$(api "repos/$REPO/git/ref/heads/$BRANCH" --jq .object.sha)
+          base=$(api "repos/$REPO/git/commits/$head" --jq .tree.sha)
+          api "repos/$REPO/tarball/$head" | tar -xz --strip-components=1 -C "$work/data"
+
+          old="$work/data/clones-ours.csv"
+          first=$(jq -r '.[0].timestamp // empty' "$work/data/clones.json" 2>/dev/null | cut -c1-10)
+          if [ -z "$READ_TOKEN" ]; then
+            echo "::notice::TRAFFIC_TOKEN is not set, so our own checkouts are not counted today."
+          elif [ -z "$first" ]; then
+            echo "::notice::No clones are recorded yet, so there are no checkouts to count."
+          else
+            GH_TOKEN="$READ_TOKEN" python3 -I .github/scripts/checkouts.py "$old" "$work/clones-ours.csv" \
+              --first-day "$first" --today "$(date -u +%F)"
+            cp "$work/clones-ours.csv" "$old"
+          fi
+          python3 -I .github/scripts/reach.py "$work/data" "$work/out"
+
+          jq -n --arg b "$base" '{base_tree: $b, tree: []}' > "$work/tree.json"
+          add() {
+            jq --arg p "$1" --rawfile c "$2" \
+              '.tree += [{path: $p, mode: "100644", type: "blob", content: $c}]' \
+              "$work/tree.json" > "$work/next.json"
+            mv "$work/next.json" "$work/tree.json"
+          }
+          if [ -f "$old" ]; then
+            add clones-ours.csv "$old"
+          fi
+          for name in README.md monthly.csv summary.md; do
+            add "reach/$name" "$work/out/$name"
+          done
+          tree=$(api -X POST "repos/$REPO/git/trees" --input "$work/tree.json" --jq .sha)
+          if [ "$tree" = "$base" ]; then
+            echo "Nothing moved since the last run. Nothing to commit."
+          else
+            commit=$(jq -n --arg m "Record our own clones and the monthly totals to $(date -u +%F)" --arg t "$tree" --arg p "$head" \
+              '{message: $m, tree: $t, parents: [$p]}' |
+              api -X POST "repos/$REPO/git/commits" --input - --jq .sha)
+            jq -n --arg s "$commit" '{sha: $s}' |
+              api -X PATCH "repos/$REPO/git/refs/heads/$BRANCH" --input - >/dev/null
+          fi
+          cat "$work/out/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       # A copy of the numbers to PostHog (.github/scripts/posthog.py,
       # ADR-0066), read from the branch as the steps above left it. Runs

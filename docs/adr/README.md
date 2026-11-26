@@ -87,6 +87,7 @@ If you disagree with one, open an issue and quote its number.
 | [0071](./0071-fresh-is-accepted-with-apply.md) | Accept --fresh with --apply | Accepted |
 | [0072](./0072-stock-hooks-and-startup-files-are-known-by-hash.md) | Know stock hooks and startup files by hash, and leave generated output out of the long-line review | Accepted |
 | [0073](./0073-no-git-reads-no-git-history.md) | --no-git reads no git history | Accepted |
+| [0074](./0074-total-reach-counts-downloads-and-clones-by-others.md) | Total reach counts release downloads and clones by others | Accepted |
 
 ## Adding one
 
