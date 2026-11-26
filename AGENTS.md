@@ -628,12 +628,25 @@ day per thing: `github_views` and `github_clones` per repository,
 `github_stars`, `github_top_referrer` and `github_top_path` (GitHub's 14-day
 totals as read that day: never sum them across days), `github_downloads`
 per release and platform, `github_checksum_downloads` per release and file,
-`github_downloads_before_log` and `github_action_users`. Every event has
+`github_downloads_before_log`, `github_action_users` and
+`github_clones_by_others` (each repository's clones less our own workflows'
+checkouts, ADR-0074). Every event has
 the distinct_id `polinrider-traffic-log` and no person profile. Its uuid is
 made from what it counts, so sending it again replaces it;
 `posthog/sent.csv` on the branch records what was sent, and each run sends
 only what is new or changed. Without the `POSTHOG_PROJECT_KEY` secret the
 step prints a notice and passes.
+
+**Total reach, monthly and all time (ADR-0074).** The Traffic log counts
+our own workflows' checkouts per day (`.github/scripts/checkouts.py`, into
+`clones-ours.csv`) and writes `reach/monthly.csv`: people's release
+downloads, clones by others per repository and their total, per month and
+for all time (`.github/scripts/reach.py`). Release downloads already include
+Homebrew, Scoop, winget, the `.deb` packages and every run of the action;
+the tap and bucket clones are machines setting those up, so the total
+counts those installs twice. A new job that checks out with submodules
+goes in `SUBMODULE_JOBS` in `checkouts.py`; a checkout step must keep
+"checkout" or "check out" in its name to be counted as ours.
 
 To send everything again, into a new project or after a change to how
 events are built:

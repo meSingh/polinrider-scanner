@@ -244,10 +244,46 @@ def release_downloads(data_dir):
     return out
 
 
+# The repositories whose own workflows clone them (checkouts.py). For these a
+# day's clones by others are sent only once clones-ours.csv has that day.
+CLONED_BY_US = ("meSingh/polinrider-scanner", "meSingh/polinrider-action")
+
+
+def clones_by_others(data_dir):
+    """github_clones_by_others: per repository per day, GitHub's clone count
+    with the checkouts our own workflows made that day taken off
+    (clones-ours.csv, written by checkouts.py; ADR-0074). The tap and the
+    bucket run no workflow, so all their clones are others'. A day of the
+    scanner or the action whose checkouts are not counted yet is left out,
+    not sent as if we had made none. `others` is never below zero."""
+    ours = {}
+    path = os.path.join(data_dir, "clones-ours.csv")
+    if os.path.exists(path):
+        with open(path, newline="") as f:
+            for row in csv.DictReader(f):
+                ours[(row["repository"], row["date"])] = int(row["checkouts"])
+    out = []
+    for e in daily_traffic(data_dir):
+        if e["event"] != "github_clones":
+            continue
+        props = e["properties"]
+        repo, day = props["repo"], props["day"]
+        if repo in CLONED_BY_US and (repo, day) not in ours:
+            continue
+        mine = ours.get((repo, day), 0)
+        out.append(event("github_clones_by_others", dt.date.fromisoformat(day), [repo], {
+            "repo": repo,
+            "clones": props["count"],
+            "ours": mine,
+            "others": max(props["count"] - mine, 0),
+        }))
+    return out
+
+
 def build(data_dir):
     if not os.path.isdir(data_dir):
         fail(f"{data_dir} is not a folder")
-    events = (daily_traffic(data_dir) + stars(data_dir) + snapshots(data_dir)
+    events = (daily_traffic(data_dir) + clones_by_others(data_dir) + stars(data_dir) + snapshots(data_dir)
               + action_users(data_dir) + release_downloads(data_dir))
     seen = {}
     for e in events:
