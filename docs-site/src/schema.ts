@@ -35,8 +35,11 @@ export const person: Node = {
 export const website: Node = {
   '@type': 'WebSite',
   '@id': ids.website,
-  name: SITE_TITLE,
-  alternateName: SHORT_TITLE,
+  // Google reads this node for the site name it shows above each result.
+  // The short name, as the title and application-name give it; the long
+  // one and the domain follow as fallbacks, in Google's order of preference.
+  name: SHORT_TITLE,
+  alternateName: [SITE_TITLE, 'polinriderscanner.com'],
   url: `${SITE_URL}/`,
   description: SITE_DESCRIPTION,
   inLanguage: 'en-IN',
