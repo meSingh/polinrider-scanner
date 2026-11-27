@@ -9,9 +9,13 @@ Written daily by .github/workflows/traffic.yml on main, by
   packages, our own taken off (downloads/). These include Homebrew, Scoop,
   winget, the .deb packages and every run of the GitHub action, which all
   download the release file. Checksums and attestations are left out.
-- `clones_*`: clones of each repository by others: GitHub's clone count with
-  the checkouts of our own workflows taken off (clones-ours.csv). The tap
-  and the bucket run no workflow, so all their clones are others'.
+- `clones_*`: unique cloners of each repository other than us, per day,
+  summed: GitHub's unique cloners, less one on a day our own workflows
+  checked the repository out (clones-ours.csv). Our checkouts collapse into
+  very few uniques, so they are taken as one cloner. The tap and the bucket
+  run no workflow, so all their cloners are others. Someone who clones on
+  three days of a month counts three times: GitHub gives uniques per day
+  only.
 - `total`: the sum. A Homebrew or Scoop install is in it twice, as a clone
   of the tap or bucket on a machine's first install and as a download.
 

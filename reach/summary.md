@@ -3,9 +3,9 @@
 | Month | Release downloads | Scanner clones | Tap clones | Bucket clones | Action clones | Total |
 |---|---:|---:|---:|---:|---:|---:|
 | before the log | 189 | 0 | 0 | 0 | 0 | 189 |
-| 2026-09 | 0 | 21 | 0 | 0 | 0 | 21 |
-| 2026-10 | 0 | 1656 | 0 | 0 | 0 | 1656 |
-| 2026-11 | 973 | 1498 | 151 | 244 | 208 | 3074 |
-| **all time** | **1162** | **3175** | **151** | **244** | **208** | **4940** |
+| 2026-09 | 0 | 15 | 0 | 0 | 0 | 15 |
+| 2026-10 | 0 | 785 | 0 | 0 | 0 | 785 |
+| 2026-11 | 974 | 673 | 90 | 173 | 95 | 2005 |
+| **all time** | **1163** | **1473** | **90** | **173** | **95** | **2994** |
 
-Clones are by others: our own workflows' checkouts are taken off. Release downloads already include Homebrew, Scoop, winget and the action.
+Clones are unique cloners per day, other than us (ADR-0075). Release downloads already include Homebrew, Scoop, winget and the action.
