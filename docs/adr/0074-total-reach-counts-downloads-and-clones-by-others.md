@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted; amended by [ADR-0075](./0075-reach-counts-unique-cloners.md) (unique cloners, not clones) |
 | **Date** | 2026-11-26 |
 
 ## Context
