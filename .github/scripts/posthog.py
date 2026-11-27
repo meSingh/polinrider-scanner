@@ -250,12 +250,22 @@ CLONED_BY_US = ("meSingh/polinrider-scanner", "meSingh/polinrider-action")
 
 
 def clones_by_others(data_dir):
-    """github_clones_by_others: per repository per day, GitHub's clone count
-    with the checkouts our own workflows made that day taken off
-    (clones-ours.csv, written by checkouts.py; ADR-0074). The tap and the
-    bucket run no workflow, so all their clones are others'. A day of the
-    scanner or the action whose checkouts are not counted yet is left out,
-    not sent as if we had made none. `others` is never below zero."""
+    """github_clones_by_others: per repository per day, clones by others
+    (ADR-0074, ADR-0075).
+
+    - `others_uniques`, the number the totals use: GitHub's unique cloners,
+      less one on a day our own workflows checked the repository out. Our
+      checkouts collapse into very few uniques (375 checkouts, 86 uniques on
+      2026-10-12), so they are taken as one cloner, ourselves;
+    - `others`: GitHub's clone count less our checkouts (clones-ours.csv,
+      written by checkouts.py). Every fetch, repeats included, so bots and
+      mirrors that clone daily weigh heavily in it.
+
+    The tap and the bucket run no workflow, so all their clones are others'.
+    A day of the scanner or the action whose checkouts are not counted yet
+    is left out, not sent as if we had made none. Neither number is below
+    zero. Unique cloners are per day: summed over a month, someone who
+    clones on three days counts three times."""
     ours = {}
     path = os.path.join(data_dir, "clones-ours.csv")
     if os.path.exists(path):
@@ -271,11 +281,15 @@ def clones_by_others(data_dir):
         if repo in CLONED_BY_US and (repo, day) not in ours:
             continue
         mine = ours.get((repo, day), 0)
+        me = 1 if mine else 0
         out.append(event("github_clones_by_others", dt.date.fromisoformat(day), [repo], {
             "repo": repo,
             "clones": props["count"],
             "ours": mine,
             "others": max(props["count"] - mine, 0),
+            "uniques": props["uniques"],
+            "ours_uniques": me,
+            "others_uniques": max(props["uniques"] - me, 0),
         }))
     return out
 

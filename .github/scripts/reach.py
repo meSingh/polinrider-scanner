@@ -13,8 +13,9 @@ same functions, so the branch and PostHog cannot disagree:
   (github_downloads, `people`), which already include Homebrew, Scoop,
   winget, the .deb packages and every run of the GitHub action, since each
   of those downloads the release file;
-- clones by others, per repository (github_clones_by_others, `others`):
-  GitHub's clone count with our own workflows' checkouts taken off.
+- clones by others, per repository (github_clones_by_others,
+  `others_uniques`): GitHub's unique cloners per day, less one on a day
+  our own workflows checked the repository out (ADR-0075).
 
 The total adds them. A Homebrew or Scoop install is counted twice in it,
 once as a clone of the tap or bucket (on a machine's first install only)
@@ -53,9 +54,13 @@ Written daily by .github/workflows/traffic.yml on main, by
   packages, our own taken off (downloads/). These include Homebrew, Scoop,
   winget, the .deb packages and every run of the GitHub action, which all
   download the release file. Checksums and attestations are left out.
-- `clones_*`: clones of each repository by others: GitHub's clone count with
-  the checkouts of our own workflows taken off (clones-ours.csv). The tap
-  and the bucket run no workflow, so all their clones are others'.
+- `clones_*`: unique cloners of each repository other than us, per day,
+  summed: GitHub's unique cloners, less one on a day our own workflows
+  checked the repository out (clones-ours.csv). Our checkouts collapse into
+  very few uniques, so they are taken as one cloner. The tap and the bucket
+  run no workflow, so all their cloners are others. Someone who clones on
+  three days of a month counts three times: GitHub gives uniques per day
+  only.
 - `total`: the sum. A Homebrew or Scoop install is in it twice, as a clone
   of the tap or bucket on a machine's first install and as a download.
 
@@ -79,7 +84,7 @@ def table(data_dir):
         elif e["event"] == "github_clones_by_others":
             for column, repo in COLUMNS:
                 if repo == p["repo"]:
-                    months[p["day"][:7]][column] += p["others"]
+                    months[p["day"][:7]][column] += p["others_uniques"]
     order = ([BEFORE] if BEFORE in months else []) + sorted(m for m in months if m != BEFORE)
     rows, everything = [], collections.Counter()
     for m in order:
@@ -108,7 +113,7 @@ def summary(rows):
         if r["month"] == ALL:
             cells = [f"**{c}**" for c in cells]
         out.append("| " + " | ".join([name] + [str(c) for c in cells]) + " |")
-    out += ["", "Clones are by others: our own workflows' checkouts are taken off. "
+    out += ["", "Clones are unique cloners per day, other than us (ADR-0075). "
             "Release downloads already include Homebrew, Scoop, winget and the action.", ""]
     return "\n".join(out)
 

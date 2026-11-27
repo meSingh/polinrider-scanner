@@ -41,7 +41,8 @@ class Table(unittest.TestCase):
         self.assertEqual(self.rows[-1]["release_downloads"], people)
 
     def test_clones_are_others_and_match_posthog(self):
-        others = sum(e["properties"]["others"] for e in self.events if e["event"] == "github_clones_by_others")
+        others = sum(e["properties"]["others_uniques"] for e in self.events
+                     if e["event"] == "github_clones_by_others")
         clones = sum(self.rows[-1][c] for c, repo in reach.COLUMNS if repo)
         self.assertEqual(clones, others)
 

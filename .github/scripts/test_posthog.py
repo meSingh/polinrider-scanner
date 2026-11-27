@@ -172,15 +172,20 @@ class FixtureOnly(unittest.TestCase):
         self.assertEqual(users, {"2026-11-20": (0, 0), "2026-11-21": (2, 3)})
 
     def test_clones_by_others_take_our_checkouts_off(self):
-        got = sorted((e["properties"]["repo"], e["properties"]["day"], e["properties"]["clones"],
-                      e["properties"]["ours"], e["properties"]["others"])
-                     for e in posthog.build(FIXTURE) if e["event"] == "github_clones_by_others")
+        p = [e["properties"] for e in posthog.build(FIXTURE) if e["event"] == "github_clones_by_others"]
+        got = sorted((x["repo"], x["day"], x["clones"], x["ours"], x["others"],
+                      x["uniques"], x["ours_uniques"], x["others_uniques"]) for x in p)
         # The scanner only on the days clones-ours.csv has, never below zero
-        # (40 of ours against 34 clones on the 18th); the tap, which runs no
-        # workflow, on every day.
-        self.assertEqual(got, [("meSingh/homebrew-tap", "2026-11-19", 7, 0, 7),
-                               ("meSingh/polinrider-scanner", "2026-11-17", 66, 22, 44),
-                               ("meSingh/polinrider-scanner", "2026-11-18", 34, 40, 0)])
+        # (40 of ours against 34 clones on the 18th), and one unique cloner
+        # less on a day we checked it out; the tap, which runs no workflow,
+        # on every day and with all its cloners.
+        with open(os.path.join(FIXTURE, "clones.json")) as f:
+            uniques = {r["timestamp"][:10]: r["uniques"] for r in json.load(f)}
+        self.assertEqual(got, [("meSingh/homebrew-tap", "2026-11-19", 7, 0, 7, 3, 0, 3),
+                               ("meSingh/polinrider-scanner", "2026-11-17", 66, 22, 44,
+                                uniques["2026-11-17"], 1, uniques["2026-11-17"] - 1),
+                               ("meSingh/polinrider-scanner", "2026-11-18", 34, 40, 0,
+                                uniques["2026-11-18"], 1, uniques["2026-11-18"] - 1)])
 
     def test_a_revised_count_keeps_its_uuid(self):
         with tempfile.TemporaryDirectory() as tmp:
